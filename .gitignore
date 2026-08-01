@@ -1,0 +1,8 @@
+# Test-Artefakte des Playwright-MCP
+.playwright-mcp/
+
+# Node
+node_modules/
+
+# Temporäre Testdateien
+_tmp_*
