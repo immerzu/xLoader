@@ -1,27 +1,45 @@
 # xLoader
 
-Tampermonkey-Userscript: lädt Medien (Bilder, Videos, GIFs) von X.com/Twitter-Tweets über den nativen **„Speichern unter“**-Dialog herunter.
+**English:** Tampermonkey userscript that downloads media (images, videos, GIFs) from X.com/Twitter tweets via the native **"Save as"** dialog. Media URLs are prefetched in the background, so the dialog opens instantly after clicking the download button.
 
-## Installation
+**Deutsch:** Tampermonkey-Userscript, das Medien (Bilder, Videos, GIFs) von X.com/Twitter-Tweets über den nativen **„Speichern unter“**-Dialog herunterlädt. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint.
 
+---
+
+## Installation / Installation
+
+**English:**
+1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome/Edge/Firefox).
+2. Install the script: open [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey will offer the installation. (Alternative: clone the repo and import the file via the Tampermonkey dashboard.)
+3. Open [x.com](https://x.com) — every tweet with media gets a download button in the action bar.
+
+**Deutsch:**
 1. [Tampermonkey](https://www.tampermonkey.net/) installieren (Chrome/Edge/Firefox).
 2. Skript installieren: [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) öffnen — Tampermonkey bietet die Installation an. (Alternativ: Repo klonen und die Datei im Tampermonkey-Dashboard importieren.)
-3. Auf [x.com](https://x.com) öffnen — unter jedem Tweet mit Medien erscheint ein Download-Button in der Aktionsleiste.
+3. [x.com](https://x.com) öffnen — unter jedem Tweet mit Medien erscheint ein Download-Button in der Aktionsleiste.
 
-## Funktionen
+## Features / Funktionen
 
+**English:**
+- **Images, videos and GIFs** — one button per tweet, one "Save as" dialog per medium.
+- **Instant dialog:** media URLs are prefetched in the background (max. 3 parallel API calls), so the dialog appears immediately after the click.
+- **Reliable URL extraction:** X.com renders videos/GIFs only as posters — the real MP4 URLs come from the X API (`conversation.json`), with live-token retry on auth errors.
+- **Filenames:** `@{handle}_{tweetId}_{index}.{ext}` (e.g. `@elonmusk_123456789_1.mp4`).
+- **Layout:** the button is cloned from an existing X.com action-bar button, so it adapts perfectly (desktop and mobile).
+
+**Deutsch:**
 - **Bilder, Videos und GIFs** — ein Button pro Tweet, „Speichern unter“-Dialog pro Medium.
-- **Sofortiger Dialog**: Medien-URLs werden im Hintergrund vorgeladen (Prefetch, max. 3 parallele API-Calls), sodass der Dialog unmittelbar nach dem Klick erscheint.
-- **Zuverlässige URL-Extraktion**: X.com rendert Videos/GIFs nur als Poster — die echten MP4-URLs kommen über die X-API (`conversation.json`), mit Live-Token-Retry bei Auth-Fehlern.
-- **Dateinamen**: `@{handle}_{tweetId}_{index}.{ext}` (z. B. `@elonmusk_123456789_1.mp4`).
-- Layout: Der Button wird aus einem vorhandenen X.com-Aktionsleisten-Button geklont und passt sich damit exakt an (Desktop und mobil).
+- **Sofortiger Dialog:** Medien-URLs werden im Hintergrund vorgeladen (max. 3 parallele API-Calls), sodass der Dialog unmittelbar nach dem Klick erscheint.
+- **Zuverlässige URL-Extraktion:** X.com rendert Videos/GIFs nur als Poster — die echten MP4-URLs kommen über die X-API (`conversation.json`), mit Live-Token-Retry bei Auth-Fehlern.
+- **Dateinamen:** `@{handle}_{tweetId}_{index}.{ext}` (z. B. `@elonmusk_123456789_1.mp4`).
+- **Layout:** Der Button wird aus einem vorhandenen X.com-Aktionsleisten-Button geklont und passt sich damit exakt an (Desktop und mobil).
 
-## Technik
+## Technical / Technik
 
-- Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`, Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`.
-- Fallback-Kette beim Klick (Cache-Miss): X-API → Live-Token-Retry → DOM (Bilder) → Fehlermeldung.
-- Keine externen Abhängigkeiten, keine Server.
+**English:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`, grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`. Click fallback chain (cache miss): X API → live-token retry → DOM (images) → error message. No external dependencies, no server.
 
-## Lizenz
+**Deutsch:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`, Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`. Fallback-Kette beim Klick (Cache-Miss): X-API → Live-Token-Retry → DOM (Bilder) → Fehlermeldung. Keine externen Abhängigkeiten, keine Server.
 
-MIT — siehe [LICENSE](LICENSE) (oder `@license MIT` im Skript-Metadatenblock).
+## License / Lizenz
+
+MIT — see [LICENSE](LICENSE) (or `@license MIT` in the script metadata block). / MIT — siehe [LICENSE](LICENSE) (bzw. `@license MIT` im Skript-Metadatenblock).
