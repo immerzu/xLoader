@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.6
-// @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint.
+// @version      1.0.7
+// @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
 // @match        https://x.com/*
@@ -10,6 +10,7 @@
 // @grant        GM_download
 // @grant        GM_addStyle
 // @grant        GM_xmlhttpRequest
+// @grant        GM_registerMenuCommand
 // @connect      x.com
 // @connect      twitter.com
 // @connect      pbs.twimg.com
@@ -19,7 +20,19 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.6 (Veröffentlichungsversion)
+ * xLoader v1.0.7 (Optionale Verbesserungen)
+ * ---------------------------------------------------------------------------
+ * v1.0.7:
+ *  - Tampermonkey-Menü (GM_registerMenuCommand):
+ *      * "Speichern unter-Dialog" umschalten: nur erstes Medium (Default) oder
+ *        alle Medien (persistiert in localStorage)
+ *      * "Medien-Cache leeren" (Prefetch-Cache + Queue zurücksetzen)
+ *  - Tweet-ID-Extraktion robuster: bevorzugt den Zeitstempel-Link (garantiert
+ *    die Haupt-Tweet-ID), dann Links ohne /photo|/video|/analytics-Suffix.
+ *    Behebt Randfälle bei Quoted-Tweets und Analytics-Links.
+ *  - saveAs-Logik: Bei Modus "nur erster" bekommt nur das erste Medium den
+ *    "Speichern unter"-Dialog, weitere Medien gehen direkt in den Download-
+ *    Ordner (deutlich weniger Klicks bei Mehrfachmedien).
  * ---------------------------------------------------------------------------
  * v1.0.6: Projekt-/Skriptname "xLoader" (zuvor Downloadhilfe); @author und
  *  @namespace auf die Veröffentlichungs-Identität gesetzt. Keine
@@ -97,6 +110,8 @@
         errorFlashMs: 2500,
         logPrefix: '[Downloadhilfe]',
         btnAttribute: 'data-downloadhilfe',
+        // Speichern-Dialog-Modus (persistiert): 'first' (nur erstes Medium) | 'all'
+        saveAsModeKey: 'xloader-saveas-mode',
         // Prefetch-Cache
         cacheTtlMs: 5 * 60 * 1000,        // X.com-Medien-URLs sind temporär
         maxParallelPrefetch: 3,           // Rate-Limiting vermeiden
@@ -597,10 +612,27 @@
     }
 
     function getTweetId(tweet) {
-        var statusLink = tweet.querySelector('a[href*="/status/"]');
-        var href = statusLink ? (statusLink.getAttribute('href') || '') : '';
-        var m = href.match(/\/status\/(\d+)/);
-        return m ? m[1] : String(Date.now());
+        // 1) Zeitstempel-Link: zeigt garantiert auf die Haupt-Tweet-ID
+        var timeEl = tweet.querySelector('time');
+        var timeLink = timeEl ? timeEl.closest('a[href*="/status/"]') : null;
+        var m = timeLink ? (timeLink.getAttribute('href') || '').match(/\/status\/(\d+)/) : null;
+        if (m) return m[1];
+
+        // 2) Bevorzugt "saubere" Links (ohne /photo|/video|/analytics-Suffix)
+        var links = tweet.querySelectorAll('a[href*="/status/"]');
+        for (var i = 0; i < links.length; i++) {
+            var h = links[i].getAttribute('href') || '';
+            if (!/\/status\/\d+\/(photo|video|analytics)/.test(h)) {
+                var mm = h.match(/\/status\/(\d+)/);
+                if (mm) return mm[1];
+            }
+        }
+        // 3) Letzter Fallback: irgendein /status/-Link
+        for (var j = 0; j < links.length; j++) {
+            var mm2 = (links[j].getAttribute('href') || '').match(/\/status\/(\d+)/);
+            if (mm2) return mm2[1];
+        }
+        return String(Date.now());
     }
 
     function sanitizeFilenamePart(str) {
@@ -619,17 +651,16 @@
     // ============================ Download-Mechanismus ====================
 
     /**
-     * Startet den Download direkt über GM_download mit der URL und öffnet
-     * mit saveAs: true sofort den nativen "Speichern unter"-Dialog — die
-     * Datei wird dabei im Hintergrund geladen (kein Blob-Umweg, keine
-     * Wartezeit in der Klick-Kette).
+     * Startet den Download direkt über GM_download mit der URL. saveAs: true
+     * öffnet den nativen "Speichern unter"-Dialog sofort; bei saveAs: false
+     * wird direkt in den Download-Ordner gespeichert (Modus "nur erster").
      */
-    function downloadUrl(url, filename) {
+    function downloadUrl(url, filename, saveAs) {
         return new Promise(function (resolve, reject) {
             GM_download({
                 url: url,
                 name: filename,
-                saveAs: true,
+                saveAs: saveAs,
                 onload: function () {
                     resolve();
                 },
@@ -641,6 +672,50 @@
                 }
             });
         });
+    }
+
+    // ============================ Menü & Konfiguration ====================
+
+    // 'first' = nur erstes Medium bekommt den "Speichern unter"-Dialog
+    // 'all'   = jedes Medium bekommt einen eigenen Dialog (früheres Verhalten)
+    var saveAsMode = getSaveAsMode();
+
+    function getSaveAsMode() {
+        try {
+            var m = localStorage.getItem(CONFIG.saveAsModeKey);
+            return (m === 'all' || m === 'first') ? m : 'first';
+        } catch (e) {
+            return 'first';
+        }
+    }
+
+    function persistSaveAsMode() {
+        try {
+            localStorage.setItem(CONFIG.saveAsModeKey, saveAsMode);
+        } catch (e) { /* ignore */ }
+    }
+
+    function toggleSaveAsMode() {
+        saveAsMode = (saveAsMode === 'first') ? 'all' : 'first';
+        persistSaveAsMode();
+        log.info('Speichern unter-Dialog-Modus: ' + (saveAsMode === 'first' ? 'nur erstes Medium' : 'alle Medien'));
+    }
+
+    function clearMediaCache() {
+        var before = mediaCache.size;
+        mediaCache.clear();
+        prefetchSeen.clear();
+        prefetchQueue.length = 0;
+        log.info('Medien-Cache geleert (' + before + ' Einträge entfernt).');
+    }
+
+    function setupMenu() {
+        if (typeof GM_registerMenuCommand !== 'function') return;
+        GM_registerMenuCommand(
+            'Speichern unter: ' + (saveAsMode === 'first' ? 'nur erstes Medium (klicken → alle)' : 'alle Medien (klicken → nur erstes)'),
+            toggleSaveAsMode
+        );
+        GM_registerMenuCommand('Medien-Cache leeren', clearMediaCache);
     }
 
     // ============================ Button-Verhalten =========================
@@ -734,9 +809,10 @@
         var failed = 0;
         for (var i = 0; i < items.length; i++) {
             var filename = '@' + handle + '_' + tweetId + '_' + (i + 1) + '.' + items[i].ext;
+            var saveAs = (saveAsMode === 'all') || (i === 0);
             try {
                 log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
-                await downloadUrl(items[i].url, filename);
+                await downloadUrl(items[i].url, filename, saveAs);
                 log.info('Gespeichert: ' + filename);
             } catch (err) {
                 failed++;
@@ -864,6 +940,7 @@
 
     function init() {
         GM_addStyle(CSS);
+        setupMenu();
         scanInitial();
 
         var observer = new MutationObserver(function (mutations) {
@@ -878,7 +955,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.6 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.7 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

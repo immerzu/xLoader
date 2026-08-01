@@ -21,18 +21,20 @@
 ## Features / Funktionen
 
 **English:**
-- **Images, videos and GIFs** — one button per tweet, one "Save as" dialog per medium.
+- **Images, videos and GIFs** — one button per tweet; the **"Save as" dialog appears for the first medium** by default (configurable: all media via the Tampermonkey menu).
 - **Instant dialog:** media URLs are prefetched in the background (max. 3 parallel API calls), so the dialog appears immediately after the click.
 - **Reliable URL extraction:** X.com renders videos/GIFs only as posters — the real MP4 URLs come from the X API (`conversation.json`), with live-token retry on auth errors.
 - **Filenames:** `@{handle}_{tweetId}_{index}.{ext}` (e.g. `@elonmusk_123456789_1.mp4`).
 - **Layout:** the button is cloned from an existing X.com action-bar button, so it adapts perfectly (desktop and mobile).
+- **Tampermonkey menu:** toggle "Save as" mode (first medium only / all media) and clear the media cache.
 
 **Deutsch:**
-- **Bilder, Videos und GIFs** — ein Button pro Tweet, „Speichern unter“-Dialog pro Medium.
+- **Bilder, Videos und GIFs** — ein Button pro Tweet; der **„Speichern unter“-Dialog erscheint standardmäßig nur für das erste Medium** (umschaltbar über das Tampermonkey-Menü).
 - **Sofortiger Dialog:** Medien-URLs werden im Hintergrund vorgeladen (max. 3 parallele API-Calls), sodass der Dialog unmittelbar nach dem Klick erscheint.
 - **Zuverlässige URL-Extraktion:** X.com rendert Videos/GIFs nur als Poster — die echten MP4-URLs kommen über die X-API (`conversation.json`), mit Live-Token-Retry bei Auth-Fehlern.
 - **Dateinamen:** `@{handle}_{tweetId}_{index}.{ext}` (z. B. `@elonmusk_123456789_1.mp4`).
 - **Layout:** Der Button wird aus einem vorhandenen X.com-Aktionsleisten-Button geklont und passt sich damit exakt an (Desktop und mobil).
+- **Tampermonkey-Menü:** „Speichern unter“-Modus umschalten (nur erstes Medium / alle Medien) und Medien-Cache leeren.
 
 ## Technical / Technik
 
