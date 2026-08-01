@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         xLoader
-// @namespace    https://github.com/xLoader/xLoader
+// @namespace    https://github.com/immerzu/xLoader
 // @version      1.0.6
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint.
 // @author       xLoader

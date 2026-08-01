@@ -5,7 +5,7 @@ Tampermonkey-Userscript: lädt Medien (Bilder, Videos, GIFs) von X.com/Twitter-T
 ## Installation
 
 1. [Tampermonkey](https://www.tampermonkey.net/) installieren (Chrome/Edge/Firefox).
-2. Skript installieren: [xLoader.user.js](https://raw.githubusercontent.com/xLoader/xLoader/main/xLoader.user.js) öffnen — Tampermonkey bietet die Installation an. (Alternativ: Repo klonen und die Datei im Tampermonkey-Dashboard importieren.)
+2. Skript installieren: [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) öffnen — Tampermonkey bietet die Installation an. (Alternativ: Repo klonen und die Datei im Tampermonkey-Dashboard importieren.)
 3. Auf [x.com](https://x.com) öffnen — unter jedem Tweet mit Medien erscheint ein Download-Button in der Aktionsleiste.
 
 ## Funktionen
