@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.7
+// @version      1.0.8
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -20,7 +20,22 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.7 (Optionale Verbesserungen)
+ * xLoader v1.0.8 (Bugfixes)
+ * ---------------------------------------------------------------------------
+ * v1.0.8:
+ *  - Live-Token-Retry wird nicht mehr durch einen gecachten (möglicherweise
+ *    veralteten) Live-Token blockiert: Bei API-Fehlern (401/403, z. B. nach
+ *    Token-Rotation durch X.com) wird jetzt IMMER versucht, einen frischen
+ *    Bearer-Token zu holen. Vorher brachen Video-/GIF-Downloads nach einer
+ *    Token-Rotation bis zum Ablauf der 1-h-TTL des Caches („Keine Medien
+ *    gefunden“).
+ *  - Prefetch-Cache-Verhalten korrigiert: Nach einem Download (Cache wird
+ *    invalidiert) wird der Tweet jetzt wieder im Hintergrund vorgeladen, wenn
+ *    er erneut im DOM erscheint (prefetchSeen-Eintrag wird geleert). Zudem
+ *    blockieren abgelaufene Cache-Einträge (TTL 5 min) keinen neuen Prefetch
+ *    mehr (getCachedItems statt mediaCache.has).
+ * ---------------------------------------------------------------------------
+ * v1.0.7 (Optionale Verbesserungen)
  * ---------------------------------------------------------------------------
  * v1.0.7:
  *  - Tampermonkey-Menü (GM_registerMenuCommand):
@@ -569,7 +584,7 @@
     function schedulePrefetch(tweet) {
         if (!tweet || !tweet.isConnected) return;
         var tweetId = getTweetId(tweet);
-        if (!tweetId || mediaCache.has(tweetId) || prefetchSeen.has(tweetId)) return;
+        if (!tweetId || getCachedItems(tweetId) !== null || prefetchSeen.has(tweetId)) return;
         if (prefetchQueue.length >= CONFIG.maxPrefetchQueue) return;
 
         prefetchSeen.add(tweetId);
@@ -748,14 +763,19 @@
      */
     async function loadItemsLive(tweet, tweetId) {
         var items = [];
+        var apiFailed = false;
         try {
             var data = await fetchTweetData(tweetId);
             items = parseApiData(data, tweetId).media;
         } catch (apiErr) {
+            apiFailed = true;
             log.warn('API-Fehler (' + apiErr.message + '), versuche Live-Token-Retry …');
         }
 
-        if (!items.length && !liveToken) {
+        // Live-Token-Retry auch bei bereits gecachtem (möglicherweise veraltetem)
+        // Token versuchen — X.com rotiert diese Tokens regelmäßig; ein stale
+        // Token würde sonst jeden 401-Fall blockieren (Videos/GIFs brechen).
+        if (!items.length && (apiFailed || !liveToken)) {
             try {
                 var token = await fetchLiveBearerToken();
                 if (token) {
@@ -821,8 +841,11 @@
         }
 
         // Cache invalidieren: X.com-URLs sind temporär; ein erneuter Klick
-        // lädt die Medien frisch (Live-Fallback).
+        // lädt die Medien frisch (Live-Fallback). Zusätzlich prefetchSeen
+        // leeren, damit der Tweet beim nächsten Erscheinen wieder im
+        // Hintergrund vorgeladen werden kann (Cache füllen).
         mediaCache.delete(tweetId);
+        prefetchSeen.delete(tweetId);
 
         setBusy(btn, false);
         if (failed > 0) {
@@ -955,7 +978,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.7 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.8 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
