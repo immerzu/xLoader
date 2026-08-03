@@ -1,10 +1,14 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.8
+// @version      1.0.9
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
+// @homepageURL  https://github.com/immerzu/xLoader
+// @supportURL   https://github.com/immerzu/xLoader/issues
+// @updateURL    https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js
+// @downloadURL  https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @grant        GM_download
@@ -15,12 +19,40 @@
 // @connect      twitter.com
 // @connect      pbs.twimg.com
 // @connect      video.twimg.com
+// @connect      abs.twimg.com
 // @noframes
 // @run-at       document-end
 // ==/UserScript==
 
 /*
- * xLoader v1.0.8 (Bugfixes)
+ * xLoader v1.0.9 (Optimierungen)
+ * ---------------------------------------------------------------------------
+ * v1.0.9:
+ *  - Bugfix: x-guest-token-Header hing fälschlich an der ct0-Länge (32) statt
+ *    am Guest-Token selbst — der Header wird jetzt immer mitgesendet, wenn ein
+ *    Guest-Token existiert.
+ *  - Bugfix: Kaputter Live-Token-Fallback (erfundene main.{Timestamp}.js-URL,
+ *    garantiert 404) entfernt; der Token wird zuerst direkt im HTML der
+ *    Startseite gesucht, erst dann in den echten Script-URLs. Zusätzlich
+ *    @connect abs.twimg.com ergänzt (X.com-Scripts liegen dort und wurden von
+ *    GM_xmlhttpRequest bisher blockiert).
+ *  - Bugfix: Prefetch-Fehler (401/429/Timeout/leere Antwort) blockierten den
+ *    Tweet dauerhaft (prefetchSeen blieb gesetzt). Jetzt max. 2 automatische
+ *    Retries mit 10-s-Cooldown, danach Aufgeben bis zum nächsten Klick.
+ *  - Bugfix: m3u8→mp4-Umbenennung im DOM-Fallback entfernt (erzeugte
+ *    potenziell kaputte Downloads — Playlisten lassen sich nicht einfach
+ *    umbenennen).
+ *  - Neu: Fortschrittsanzeige beim Download (GM_download onprogress) im
+ *    Button-Titel ("Lade i/n … 42%").
+ *  - Neu: Prefetch nur für sichtbare Tweets (IntersectionObserver,
+ *    rootMargin 200px) — deutlich weniger API-Calls beim schnellen Scrollen.
+ *  - Fehlermeldungen differenziert: 429 (Rate-Limit) und 401/403 werden
+ *    explizit angezeigt statt "Keine Medien gefunden".
+ *  - Konsistenz: Log-Präfix [xLoader], localStorage-Keys, data-Attribute und
+ *    CSS-Klassen auf xLoader umgestellt (alter Live-Token-Key wird beim
+ *    ersten Lesen migriert).
+ *  - Metadaten: @homepageURL/@supportURL/@updateURL/@downloadURL auf GitHub
+ *    (immerzu/xLoader) ergänzt.
  * ---------------------------------------------------------------------------
  * v1.0.8:
  *  - Live-Token-Retry wird nicht mehr durch einen gecachten (möglicherweise
@@ -123,8 +155,8 @@
         requestTimeoutMs: 60000,
         recheckDelayMs: 2000,
         errorFlashMs: 2500,
-        logPrefix: '[Downloadhilfe]',
-        btnAttribute: 'data-downloadhilfe',
+        logPrefix: '[xLoader]',
+        btnAttribute: 'data-xloader',
         // Speichern-Dialog-Modus (persistiert): 'first' (nur erstes Medium) | 'all'
         saveAsModeKey: 'xloader-saveas-mode',
         // Prefetch-Cache
@@ -141,26 +173,26 @@
             guestBearer: 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
             liveTokenRe: /["'](A{20,}[a-zA-Z0-9%_\-]{40,})["']/,
             liveTokenTtlMs: 3600000,
-            localStorageKey: 'downloadhilfe-live-token'
+            localStorageKey: 'xloader-live-token'
         }
     };
 
     const CSS = [
         // Layout kommt vom geklonten X.com-Button; hier nur Zähler ausblenden,
         // Hover-/Fehlerfarben und Icon-Stil.
-        '.downloadhilfe-wrap > button > div > div:nth-child(2) { display: none; }',
-        '.downloadhilfe-wrap:hover > button > div,',
-        '.downloadhilfe-btn:hover > div { color: rgb(29, 155, 240); }',
-        '.downloadhilfe-wrap:hover > button > div > div > div,',
-        '.downloadhilfe-btn:hover > div > div > div { background-color: rgba(29, 155, 240, 0.1); }',
-        '.downloadhilfe-wrap:active > button > div > div > div,',
-        '.downloadhilfe-btn:active > div > div > div { background-color: rgba(29, 155, 240, 0.2); }',
-        '.downloadhilfe-btn:disabled { opacity: 0.5; cursor: default; }',
-        '.downloadhilfe-wrap.is-error > button > div,',
-        '.downloadhilfe-btn.is-error > div { color: rgb(244, 33, 46); }',
-        '.downloadhilfe-wrap.is-error > button > div > div > div,',
-        '.downloadhilfe-btn.is-error > div > div > div { background-color: rgba(244, 33, 46, 0.1); }',
-        '.downloadhilfe-btn svg path {',
+        '.xloader-wrap > button > div > div:nth-child(2) { display: none; }',
+        '.xloader-wrap:hover > button > div,',
+        '.xloader-btn:hover > div { color: rgb(29, 155, 240); }',
+        '.xloader-wrap:hover > button > div > div > div,',
+        '.xloader-btn:hover > div > div > div { background-color: rgba(29, 155, 240, 0.1); }',
+        '.xloader-wrap:active > button > div > div > div,',
+        '.xloader-btn:active > div > div > div { background-color: rgba(29, 155, 240, 0.2); }',
+        '.xloader-btn:disabled { opacity: 0.5; cursor: default; }',
+        '.xloader-wrap.is-error > button > div,',
+        '.xloader-btn.is-error > div { color: rgb(244, 33, 46); }',
+        '.xloader-wrap.is-error > button > div > div > div,',
+        '.xloader-btn.is-error > div > div > div { background-color: rgba(244, 33, 46, 0.1); }',
+        '.xloader-btn svg path {',
         '  fill: none;',
         '  stroke: currentColor;',
         '  stroke-width: 2;',
@@ -207,10 +239,8 @@
         if (!url || typeof url !== 'string') return null;
         url = url.trim();
         if (!url || url.indexOf('blob:') === 0 || url.indexOf('data:') === 0) return null;
-        if (!isMediaUrl(url)) return null;
-        if (/\.m3u8(\?|#|$)/i.test(url) && /\/vid\/[^/?#]+\//.test(url)) {
-            return url.replace(/\.m3u8(\?|#|$)/i, '.mp4$1');
-        }
+        // m3u8-Playlisten NICHT in .mp4 umbenennen — das erzeugt kaputte
+        // Downloads (die Server liefern dann 404 oder falschen Content-Type).
         return url;
     }
 
@@ -339,6 +369,14 @@
     function getCachedLiveToken() {
         try {
             var raw = localStorage.getItem(CONFIG.api.localStorageKey);
+            if (!raw) {
+                // Migration vom alten Key (downloadhilfe-live-token)
+                var legacy = localStorage.getItem('downloadhilfe-live-token');
+                if (legacy) {
+                    localStorage.setItem(CONFIG.api.localStorageKey, legacy);
+                    raw = legacy;
+                }
+            }
             if (!raw) return null;
             var cached = JSON.parse(raw);
             if (!cached || !cached.token || !cached.ts) return null;
@@ -372,7 +410,7 @@
             'x-twitter-client-language': cookies.lang || 'en',
             'x-csrf-token': cookies.ct0 || ''
         };
-        if (cookies.gt && cookies.ct0 && cookies.ct0.length === 32) {
+        if (cookies.gt) {
             headers['x-guest-token'] = cookies.gt;
         }
 
@@ -390,7 +428,9 @@
                             reject(new Error('API JSON-Parse-Fehler'));
                         }
                     } else {
-                        reject(new Error('API HTTP ' + res.status));
+                        var err = new Error('API HTTP ' + res.status);
+                        err.status = res.status;
+                        reject(err);
                     }
                 },
                 onerror: function () {
@@ -526,6 +566,13 @@
         return (function () {
             var scriptUrls = [];
             return gmGet(location.origin + '/').then(function (html) {
+                // 1) Zuerst direkt im HTML suchen — Inline-Scripts enthalten den
+                //    Token oft bereits.
+                var inline = TOKEN_RE.exec(html);
+                if (inline && inline[1]) return inline[1];
+
+                // 2) Externe Script-URLs aus dem HTML einsammeln (nur echte
+                //    src-URLs — keine erfundenen Cache-Buster-URLs).
                 var srcRe = /<script[^>]+src=["']([^"']+)["']/gi;
                 var m;
                 while ((m = srcRe.exec(html)) !== null) {
@@ -535,7 +582,8 @@
                     if (url.indexOf('twimg.com/') === -1 && url.indexOf('twitter.com/') === -1 && url.indexOf('x.com/') === -1) continue;
                     scriptUrls.push(url);
                 }
-                scriptUrls.push('https://abs.twimg.com/responsive-web/client-web/main.' + Date.now() + 'a.js');
+
+                if (!scriptUrls.length) throw new Error('keine Scripts im HTML');
 
                 var chain = Promise.reject(new Error('keine Scripts'));
                 scriptUrls.slice(0, 5).forEach(function (scriptUrl) {
@@ -558,8 +606,12 @@
     var mediaCache = new Map();
     // Tweet-IDs, für die bereits ein Prefetch geplant/gestartet wurde
     var prefetchSeen = new Set();
+    // Fehlversuche pro Tweet-ID (max. MAX_PREFETCH_RETRIES, dann aufgeben)
+    var prefetchRetries = new Map();
     var prefetchQueue = [];
     var activePrefetches = 0;
+    var MAX_PREFETCH_RETRIES = 2;
+    var PREFETCH_RETRY_DELAY_MS = 10000;
 
     /**
      * Liefert gecachte Medien-Items für eine Tweet-ID oder null.
@@ -599,15 +651,40 @@
             var parsed = parseApiData(data, tweetId);
             if (parsed.media && parsed.media.length) {
                 mediaCache.set(tweetId, { items: parsed.media, fetchedAt: Date.now() });
+                prefetchRetries.delete(tweetId);
                 log.info('Prefetch abgeschlossen für Tweet ' + tweetId +
                     ' (' + parsed.media.length + ' Medium/Medien).');
+            } else {
+                failPrefetch(tweetId, 'leere Medien-Antwort');
             }
         } catch (err) {
-            log.warn('Prefetch fehlgeschlagen für Tweet ' + tweetId + ': ' + err.message);
+            failPrefetch(tweetId, err.message);
         } finally {
             activePrefetches--;
             drainPrefetchQueue();
         }
+    }
+
+    /**
+     * Behandelt einen fehlgeschlagenen Prefetch: max. MAX_PREFETCH_RETRIES
+     * automatische Versuche mit PREFETCH_RETRY_DELAY_MS Cooldown, danach
+     * Aufgeben (prefetchSeen bleibt gesetzt -> erst wieder nach einem Klick).
+     */
+    function failPrefetch(tweetId, reason) {
+        var tries = (prefetchRetries.get(tweetId) || 0) + 1;
+        if (tries >= MAX_PREFETCH_RETRIES) {
+            prefetchRetries.delete(tweetId);
+            log.warn('Prefetch für Tweet ' + tweetId + ' endgültig aufgegeben: ' + reason);
+            return;
+        }
+        prefetchRetries.set(tweetId, tries);
+        prefetchSeen.delete(tweetId); // Retry erlauben
+        setTimeout(function () {
+            if (prefetchSeen.has(tweetId) || getCachedItems(tweetId) !== null) return;
+            prefetchSeen.add(tweetId);
+            log.info('Prefetch-Retry (' + tries + '/' + MAX_PREFETCH_RETRIES + ') für Tweet ' + tweetId);
+            prefetch(tweetId); // fire-and-forget
+        }, PREFETCH_RETRY_DELAY_MS);
     }
 
     function drainPrefetchQueue() {
@@ -670,9 +747,9 @@
      * öffnet den nativen "Speichern unter"-Dialog sofort; bei saveAs: false
      * wird direkt in den Download-Ordner gespeichert (Modus "nur erster").
      */
-    function downloadUrl(url, filename, saveAs) {
+    function downloadUrl(url, filename, saveAs, onProgress) {
         return new Promise(function (resolve, reject) {
-            GM_download({
+            var opts = {
                 url: url,
                 name: filename,
                 saveAs: saveAs,
@@ -685,7 +762,9 @@
                 ontimeout: function () {
                     reject(new Error('GM_download: Timeout'));
                 }
-            });
+            };
+            if (typeof onProgress === 'function') opts.onprogress = onProgress;
+            GM_download(opts);
         });
     }
 
@@ -720,6 +799,7 @@
         var before = mediaCache.size;
         mediaCache.clear();
         prefetchSeen.clear();
+        prefetchRetries.clear();
         prefetchQueue.length = 0;
         log.info('Medien-Cache geleert (' + before + ' Einträge entfernt).');
     }
@@ -741,7 +821,7 @@
     }
 
     function getWrap(btn) {
-        return btn.closest ? btn.closest('.downloadhilfe-wrap') : null;
+        return btn.closest ? btn.closest('.xloader-wrap') : null;
     }
 
     function flashError(btn, message) {
@@ -757,6 +837,9 @@
         }, CONFIG.errorFlashMs);
     }
 
+    // Letzter HTTP-Status der X-API beim Live-Fallback (für Fehlermeldungen)
+    var lastApiStatus = null;
+
     /**
      * Live-Fallback für den Klick (Cache-Miss): API -> Live-Token-Retry ->
      * DOM (Bilder). Liefert ein Array von { url, ext }.
@@ -769,6 +852,7 @@
             items = parseApiData(data, tweetId).media;
         } catch (apiErr) {
             apiFailed = true;
+            lastApiStatus = apiErr.status || null;
             log.warn('API-Fehler (' + apiErr.message + '), versuche Live-Token-Retry …');
         }
 
@@ -810,6 +894,7 @@
 
         var tweetId = getTweetId(tweet);
         var handle = sanitizeFilenamePart(getHandle(tweet));
+        lastApiStatus = null;
         var items = getCachedItems(tweetId);
 
         if (items && items.length) {
@@ -821,8 +906,14 @@
 
         if (!items.length) {
             setBusy(btn, false);
-            flashError(btn, 'Keine Medien gefunden');
-            log.warn('Keine Medien für Tweet ' + tweetId + ' gefunden (Cache + API + DOM).');
+            var msg = 'Keine Medien gefunden';
+            if (lastApiStatus === 429) {
+                msg = 'Rate-Limit (429) - kurz warten, dann erneut versuchen';
+            } else if (lastApiStatus === 401 || lastApiStatus === 403) {
+                msg = 'Zugriff verweigert (' + lastApiStatus + ')';
+            }
+            flashError(btn, msg);
+            log.warn('Keine Medien für Tweet ' + tweetId + ' gefunden (Cache + API + DOM). API-Status: ' + lastApiStatus);
             return;
         }
 
@@ -832,7 +923,11 @@
             var saveAs = (saveAsMode === 'all') || (i === 0);
             try {
                 log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
-                await downloadUrl(items[i].url, filename, saveAs);
+                await downloadUrl(items[i].url, filename, saveAs, function (progress) {
+                    if (progress && typeof progress.percent === 'number') {
+                        btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + progress.percent + '%';
+                    }
+                });
                 log.info('Gespeichert: ' + filename);
             } catch (err) {
                 failed++;
@@ -893,8 +988,8 @@
         btn.setAttribute('aria-label', 'Medien herunterladen');
         btn.title = 'Medien herunterladen';
 
-        if (clone !== btn) clone.classList.add('downloadhilfe-wrap');
-        btn.classList.add('downloadhilfe-btn');
+        if (clone !== btn) clone.classList.add('xloader-wrap');
+        btn.classList.add('xloader-btn');
 
         btn.addEventListener('click', function (ev) {
             ev.preventDefault();
@@ -906,6 +1001,33 @@
         return btn;
     }
 
+    /**
+     * Plant den Prefetch erst, wenn der Tweet sichtbar wird (Intersection-
+     * Observer, rootMargin 200px). Tweets, die beim Scrollen nur kurz durchs
+     * DOM laufen und nie sichtbar werden, kosten so keine API-Calls.
+     * Fallback ohne IntersectionObserver: sofortiger Prefetch wie bisher.
+     */
+    var prefetchObserver = null;
+
+    function observeForPrefetch(tweet) {
+        if (!('IntersectionObserver' in window)) {
+            schedulePrefetch(tweet);
+            return;
+        }
+        if (!prefetchObserver) {
+            prefetchObserver = new IntersectionObserver(function (entries) {
+                for (var i = 0; i < entries.length; i++) {
+                    if (entries[i].isIntersecting) {
+                        var t = entries[i].target;
+                        prefetchObserver.unobserve(t);
+                        schedulePrefetch(t);
+                    }
+                }
+            }, { rootMargin: '200px 0px' });
+        }
+        prefetchObserver.observe(tweet);
+    }
+
     function processTweet(tweet) {
         if (!tweet || !tweet.isConnected) return;
         if (tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) return;
@@ -913,15 +1035,15 @@
         if (hasMediaIndicator(tweet)) {
             var btn = createButton(tweet);
             if (btn) log.info('Download-Button eingefügt für Tweet ' + getTweetId(tweet));
-            // Medien-URLs im Hintergrund vorladen (Cache füllen)
-            schedulePrefetch(tweet);
-        } else if (!tweet.dataset.downloadhilfeRechecked) {
-            tweet.dataset.downloadhilfeRechecked = '1';
+            // Medien-URLs im Hintergrund vorladen, sobald der Tweet sichtbar ist
+            observeForPrefetch(tweet);
+        } else if (!tweet.dataset.xloaderRechecked) {
+            tweet.dataset.xloaderRechecked = '1';
             setTimeout(function () {
                 if (tweet.isConnected && !tweet.querySelector('button[' + CONFIG.btnAttribute + ']') &&
                     hasMediaIndicator(tweet)) {
                     createButton(tweet);
-                    schedulePrefetch(tweet);
+                    observeForPrefetch(tweet);
                 }
             }, CONFIG.recheckDelayMs);
         }
@@ -978,7 +1100,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.8 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.9 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
