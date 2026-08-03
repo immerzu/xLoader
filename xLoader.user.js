@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.10
+// @version      1.0.11
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,18 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.10 (Bugfix Fortschrittsanzeige)
+ * xLoader v1.0.11 (Bugfix: "NaN%" im Fortschritt)
+ * ---------------------------------------------------------------------------
+ * v1.0.11:
+ *  - Fix: Bei Downloads ohne brauchbare Größenangabe zeigte das Fortschritts-
+ *    Badge "NaN%" — Tampermonkey liefert in onprogress teils fehlende oder
+ *    NaN-Werte für done/total (z. B. unbekannte Gesamtgröße). Fehlende/nicht-
+ *    endliche Werte werden jetzt ignoriert (Badge bleibt unverändert), nur
+ *    gültige Prozente werden angezeigt.
+ *  - Badge jetzt nur noch bei Videodateien ab 5 MB (CONFIG.progressBadgeMinBytes):
+ *    Bei Bildern und kurzen Videos erscheint keine Fortschrittsanzeige mehr.
+ * ---------------------------------------------------------------------------
+ * v1.0.10 (Bugfix Fortschrittsanzeige)
  * ---------------------------------------------------------------------------
  * v1.0.10:
  *  - Fix: Fortschrittsanzeige funktionierte nicht — Tampermonkey liefert im
@@ -167,6 +178,9 @@
         requestTimeoutMs: 60000,
         recheckDelayMs: 2000,
         errorFlashMs: 2500,
+        // Fortschritts-Badge nur bei größeren Videodateien (bei Bildern/
+        // kurzen Videos ist die Anzeige sinnlos)
+        progressBadgeMinBytes: 5 * 1024 * 1024,
         logPrefix: '[xLoader]',
         btnAttribute: 'data-xloader',
         // Speichern-Dialog-Modus (persistiert): 'first' (nur erstes Medium) | 'all'
@@ -975,20 +989,30 @@
         for (var i = 0; i < items.length; i++) {
             var filename = '@' + handle + '_' + tweetId + '_' + (i + 1) + '.' + items[i].ext;
             var saveAs = (saveAsMode === 'all') || (i === 0);
-            showProgress(btn, 0);
+            // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
+            var isVideo = (items[i].ext === 'mp4');
             try {
                 log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
                 await downloadUrl(items[i].url, filename, saveAs, function (progress) {
-                    if (!progress) return;
+                    // Badge nur bei Videodateien ab einer Mindestgröße — bei
+                    // Bildern und kurzen Videos wird nichts angezeigt.
+                    if (!progress || !isVideo) return;
+                    var total = Number(progress.total);
+                    if (!isFinite(total) || total < CONFIG.progressBadgeMinBytes) return;
                     // Tampermonkey liefert { done, total } (Bytes) — percent
                     // existiert dort nicht, wird aber unterstützt, falls ein
-                    // anderer Manager ihn liefert.
+                    // anderer Manager ihn liefert. done kann fehlen oder NaN
+                    // sein (z. B. unbekannte Gesamtgröße) — dann wird kein
+                    // Prozentwert angezeigt statt "NaN%".
                     var pct = progress.percent;
-                    if (typeof pct !== 'number' && progress.total > 0) {
-                        pct = Math.round((progress.done / progress.total) * 100);
+                    if (typeof pct !== 'number') {
+                        var done = Number(progress.done);
+                        if (isFinite(done) && isFinite(total) && total > 0) {
+                            pct = Math.round((done / total) * 100);
+                        }
                     }
-                    if (typeof pct === 'number') {
-                        pct = Math.max(0, Math.min(100, pct));
+                    if (typeof pct === 'number' && isFinite(pct)) {
+                        pct = Math.max(0, Math.min(100, Math.round(pct)));
                         showProgress(btn, pct);
                         btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
                     }
@@ -1166,7 +1190,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.10 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.11 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
