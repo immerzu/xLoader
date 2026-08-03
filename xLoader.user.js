@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.9
+// @version      1.0.10
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,19 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.9 (Optimierungen)
+ * xLoader v1.0.10 (Bugfix Fortschrittsanzeige)
+ * ---------------------------------------------------------------------------
+ * v1.0.10:
+ *  - Fix: Fortschrittsanzeige funktionierte nicht — Tampermonkey liefert im
+ *    GM_download-onprogress nur { done, total } (Bytes), kein percent. Der
+ *    Prozentwert wird jetzt daraus berechnet (progress.percent wird weiterhin
+ *    unterstützt, falls ein Manager ihn liefert).
+ *  - Neu: Sichtbares Fortschritts-Badge über dem Button (vorher lief die
+ *    Anzeige nur über btn.title = Hover-Tooltip und war praktisch nicht
+ *    wahrnehmbar). Das Badge zeigt "42%" und verschwindet nach dem Download
+ *    automatisch.
+ * ---------------------------------------------------------------------------
+ * v1.0.9 (Optimierungen)
  * ---------------------------------------------------------------------------
  * v1.0.9:
  *  - Bugfix: x-guest-token-Header hing fälschlich an der ct0-Länge (32) statt
@@ -198,6 +210,25 @@
         '  stroke-width: 2;',
         '  stroke-linecap: round;',
         '  stroke-linejoin: round;',
+        '}',
+        // Fortschritts-Badge: sichtbare Prozent-Anzeige während des Downloads
+        '.xloader-progress {',
+        '  position: absolute;',
+        '  top: -8px;',
+        '  right: -8px;',
+        '  min-width: 22px;',
+        '  height: 18px;',
+        '  padding: 0 5px;',
+        '  border-radius: 9999px;',
+        '  background: rgb(29, 155, 240);',
+        '  color: #fff;',
+        '  font-size: 11px;',
+        '  font-weight: 700;',
+        '  line-height: 18px;',
+        '  text-align: center;',
+        '  z-index: 5;',
+        '  pointer-events: none;',
+        '  box-sizing: border-box;',
         '}'
     ].join('\n');
 
@@ -837,6 +868,29 @@
         }, CONFIG.errorFlashMs);
     }
 
+    /**
+     * Sichtbare Fortschrittsanzeige: kleines Badge über dem Button-Wrapper.
+     * Erscheint nur während eines Downloads (hideProgress blendet es aus).
+     */
+    function showProgress(btn, percent) {
+        var wrap = getWrap(btn) || btn;
+        if (!wrap.style.position) wrap.style.position = 'relative';
+        var badge = wrap.querySelector('.xloader-progress');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.className = 'xloader-progress';
+            wrap.appendChild(badge);
+        }
+        badge.textContent = percent + '%';
+        badge.style.display = 'block';
+    }
+
+    function hideProgress(btn) {
+        var wrap = getWrap(btn) || btn;
+        var badge = wrap.querySelector('.xloader-progress');
+        if (badge) badge.style.display = 'none';
+    }
+
     // Letzter HTTP-Status der X-API beim Live-Fallback (für Fehlermeldungen)
     var lastApiStatus = null;
 
@@ -921,11 +975,22 @@
         for (var i = 0; i < items.length; i++) {
             var filename = '@' + handle + '_' + tweetId + '_' + (i + 1) + '.' + items[i].ext;
             var saveAs = (saveAsMode === 'all') || (i === 0);
+            showProgress(btn, 0);
             try {
                 log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
                 await downloadUrl(items[i].url, filename, saveAs, function (progress) {
-                    if (progress && typeof progress.percent === 'number') {
-                        btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + progress.percent + '%';
+                    if (!progress) return;
+                    // Tampermonkey liefert { done, total } (Bytes) — percent
+                    // existiert dort nicht, wird aber unterstützt, falls ein
+                    // anderer Manager ihn liefert.
+                    var pct = progress.percent;
+                    if (typeof pct !== 'number' && progress.total > 0) {
+                        pct = Math.round((progress.done / progress.total) * 100);
+                    }
+                    if (typeof pct === 'number') {
+                        pct = Math.max(0, Math.min(100, pct));
+                        showProgress(btn, pct);
+                        btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
                     }
                 });
                 log.info('Gespeichert: ' + filename);
@@ -934,6 +999,7 @@
                 log.error('Download fehlgeschlagen (' + items[i].url + '): ' + err.message);
             }
         }
+        hideProgress(btn);
 
         // Cache invalidieren: X.com-URLs sind temporär; ein erneuter Klick
         // lädt die Medien frisch (Live-Fallback). Zusätzlich prefetchSeen
@@ -1100,7 +1166,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.9 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.10 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
