@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.15
+// @version      1.0.16
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,14 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.15 (Artikel-Card-Bilder)
+ * xLoader v1.0.16 (Dateinamen-Template)
+ * ---------------------------------------------------------------------------
+ * v1.0.16:
+ *  - Neu: Konfigurierbares Dateinamen-Muster (Tampermonkey-Menü, persistiert
+ *    in localStorage). Platzhalter: {handle} {id} {index} {ext} {date} {time}
+ *    {type}. Default: @{handle}_{id}_{index}.{ext} (bisheriges Verhalten).
+ * ---------------------------------------------------------------------------
+ * v1.0.15 (Artikel-Card-Bilder)
  * ---------------------------------------------------------------------------
  * v1.0.15:
  *  - Fix: Bilder von Artikel-Cards (verlinkte Artikel) wurden nicht geladen —
@@ -238,6 +245,10 @@
         btnAttribute: 'data-xloader',
         // Speichern-Dialog-Modus (persistiert): 'first' (nur erstes Medium) | 'all'
         saveAsModeKey: 'xloader-saveas-mode',
+        // Dateinamen-Muster (persistiert), Platzhalter:
+        // {handle} {id} {index} {ext} {date} {time} {type}
+        filenameTemplateKey: 'xloader-filename-template',
+        defaultFilenameTemplate: '@{handle}_{id}_{index}.{ext}',
         // Prefetch-Cache
         cacheTtlMs: 5 * 60 * 1000,        // X.com-Medien-URLs sind temporär
         maxParallelPrefetch: 3,           // Rate-Limiting vermeiden
@@ -950,6 +961,48 @@
         log.info('Speichern unter-Dialog-Modus: ' + (saveAsMode === 'first' ? 'nur erstes Medium' : 'alle Medien'));
     }
 
+    // ============================ Dateinamen-Template ====================
+
+    function getFilenameTemplate() {
+        try {
+            var t = localStorage.getItem(CONFIG.filenameTemplateKey);
+            return (t && t.trim()) ? t.trim() : CONFIG.defaultFilenameTemplate;
+        } catch (e) {
+            return CONFIG.defaultFilenameTemplate;
+        }
+    }
+
+    function setFilenameTemplate(t) {
+        try {
+            localStorage.setItem(CONFIG.filenameTemplateKey, t);
+        } catch (e) { /* ignore */ }
+    }
+
+    function pad2(n) {
+        return (n < 10 ? '0' : '') + n;
+    }
+
+    /**
+     * Ersetzt die Platzhalter {handle} {id} {index} {ext} {date} {time} {type}
+     * im Dateinamen-Muster. Unbekannte Platzhalter werden entfernt.
+     */
+    function formatFilename(template, data) {
+        var now = new Date();
+        var type = (/^(jpe?g|png|webp)$/i.test(data.ext || '')) ? 'image' : 'video';
+        var map = {
+            handle: data.handle || 'unknown',
+            id: data.id || '',
+            index: data.index || 1,
+            ext: data.ext || 'jpg',
+            date: now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()),
+            time: pad2(now.getHours()) + '-' + pad2(now.getMinutes()) + '-' + pad2(now.getSeconds()),
+            type: type
+        };
+        return String(template).replace(/\{([a-zA-Z]+)\}/g, function (m, key) {
+            return (key in map) ? String(map[key]) : '';
+        });
+    }
+
     function clearMediaCache() {
         var before = mediaCache.size;
         mediaCache.clear();
@@ -966,6 +1019,16 @@
             toggleSaveAsMode
         );
         GM_registerMenuCommand('Medien-Cache leeren', clearMediaCache);
+        GM_registerMenuCommand('Dateinamen-Muster ändern: ' + getFilenameTemplate(), function () {
+            var t = prompt(
+                'Dateinamen-Muster (Platzhalter: {handle} {id} {index} {ext} {date} {time} {type}):',
+                getFilenameTemplate()
+            );
+            if (t !== null && t.trim()) {
+                setFilenameTemplate(t.trim());
+                log.info('Dateinamen-Muster: ' + getFilenameTemplate());
+            }
+        });
     }
 
     // ============================ Button-Verhalten =========================
@@ -1197,7 +1260,12 @@
 
         var failed = 0;
         for (var i = 0; i < items.length; i++) {
-            var filename = '@' + handle + '_' + tweetId + '_' + (i + 1) + '.' + items[i].ext;
+            var filename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
+                handle: handle,
+                id: tweetId,
+                index: i + 1,
+                ext: items[i].ext
+            }));
             var saveAs = (saveAsMode === 'all') || (i === 0);
             // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
             var isVideo = (items[i].ext === 'mp4');
@@ -1406,7 +1474,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.15 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.16 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
