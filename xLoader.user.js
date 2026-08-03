@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.11
+// @version      1.0.12
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,32 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.11 (Bugfix: "NaN%" im Fortschritt)
+ * xLoader v1.0.12 (Fehlerbehebungen)
+ * ---------------------------------------------------------------------------
+ * v1.0.12:
+ *  - Fix: normalizeMediaUrl akzeptierte wieder ALLE URLs — der isMediaUrl-
+ *    Filter ging bei der m3u8-Bereinigung in v1.0.9 verloren. Der DOM-
+ *    Fallback hätte dadurch auch Avatare/Icons/Emojis/externe Bilder als
+ *    Medien heruntergeladen.
+ *  - Fix: GM_download ohne timeout — ein hängender Download (Server ohne
+ *    Antwort) deaktivierte den Button dauerhaft ("Lädt Medien …"). Jetzt
+ *    greift nach CONFIG.requestTimeoutMs (60 s) der ontimeout-Pfad.
+ *  - Fix: Live-Token-Retry wurde auch bei HTTP 429 (Rate-Limit) ausgelöst —
+ *    der Token ist dort nicht das Problem, der Retry verschärfte das Limit
+ *    nur. Token-Retry jetzt nur bei Auth-/Netzwerkfehlern.
+ *  - Fix: Tweets im Prefetch-Retry-Cooldown wurden bei erneutem Erscheinen
+ *    im DOM sofort neu gestartet (Doppel-Request). schedulePrefetch wartet
+ *    jetzt auf den geplanten Retry.
+ *  - Verbessert: Medien-Recheck läuft bis zu 3× (vorher genau 1×) — Tweets,
+ *    deren Medien erst später laden (Lazy-Loading), bekommen nun doch einen
+ *    Download-Button.
+ *  - Fix: GIF-Tweets lieferten im DOM-Fallback (API nicht erreichbar) nichts
+ *    ("Keine Medien gefunden") — das Poster (tweet_video_thumb) wurde nicht
+ *    erkannt. Aus dem Poster wird jetzt die echte MP4-URL abgeleitet
+ *    (pbs.twimg.com/tweet_video_thumb/<id> -> video.twimg.com/tweet_video/<id>.mp4,
+ *    live verifiziert) — GIFs sind auf X.com MP4-Streams.
+ * ---------------------------------------------------------------------------
+ * v1.0.11 (Bugfix: "NaN%" im Fortschritt)
  * ---------------------------------------------------------------------------
  * v1.0.11:
  *  - Fix: Bei Downloads ohne brauchbare Größenangabe zeigte das Fortschritts-
@@ -284,6 +309,16 @@
         if (!url || typeof url !== 'string') return null;
         url = url.trim();
         if (!url || url.indexOf('blob:') === 0 || url.indexOf('data:') === 0) return null;
+        // GIF-Poster (tweet_video_thumb) -> echte MP4-URL ableiten (X.com-GIFs
+        // sind MP4-Streams): pbs.twimg.com/tweet_video_thumb/<id>?format=jpg
+        // liefert nur das Poster; video.twimg.com/tweet_video/<id>.mp4 das GIF.
+        var gifMatch = url.match(/pbs\.twimg\.com\/tweet_video_thumb\/([A-Za-z0-9_-]+)/);
+        if (gifMatch) {
+            return 'https://video.twimg.com/tweet_video/' + gifMatch[1] + '.mp4';
+        }
+        // Nur echte X.com-Medien-URLs akzeptieren (Avatar-/Icon-/Emoji-Bilder
+        // und externe URLs gehören nicht in den Download).
+        if (!isMediaUrl(url)) return null;
         // m3u8-Playlisten NICHT in .mp4 umbenennen — das erzeugt kaputte
         // Downloads (die Server liefern dann 404 oder falschen Content-Type).
         return url;
@@ -682,6 +717,9 @@
         if (!tweet || !tweet.isConnected) return;
         var tweetId = getTweetId(tweet);
         if (!tweetId || getCachedItems(tweetId) !== null || prefetchSeen.has(tweetId)) return;
+        // Tweet im Retry-Cooldown (z. B. nach 429) nicht sofort neu starten —
+        // der geplante Retry übernimmt das nach PREFETCH_RETRY_DELAY_MS.
+        if (prefetchRetries.has(tweetId)) return;
         if (prefetchQueue.length >= CONFIG.maxPrefetchQueue) return;
 
         prefetchSeen.add(tweetId);
@@ -798,6 +836,7 @@
                 url: url,
                 name: filename,
                 saveAs: saveAs,
+                timeout: CONFIG.requestTimeoutMs,
                 onload: function () {
                     resolve();
                 },
@@ -921,13 +960,14 @@
         } catch (apiErr) {
             apiFailed = true;
             lastApiStatus = apiErr.status || null;
-            log.warn('API-Fehler (' + apiErr.message + '), versuche Live-Token-Retry …');
+            log.warn('API-Fehler (' + apiErr.message + ').');
         }
 
         // Live-Token-Retry auch bei bereits gecachtem (möglicherweise veraltetem)
         // Token versuchen — X.com rotiert diese Tokens regelmäßig; ein stale
         // Token würde sonst jeden 401-Fall blockieren (Videos/GIFs brechen).
-        if (!items.length && (apiFailed || !liveToken)) {
+        if (!items.length && lastApiStatus !== 429 && (apiFailed || !liveToken)) {
+            log.info('Versuche Live-Bearer-Token-Retry …');
             try {
                 var token = await fetchLiveBearerToken();
                 if (token) {
@@ -1118,6 +1158,9 @@
         prefetchObserver.observe(tweet);
     }
 
+    // Maximale Anzahl Medien-Rechecks pro Tweet (Lazy-Loading-Abdeckung)
+    var MAX_TWEET_RECHECKS = 3;
+
     function processTweet(tweet) {
         if (!tweet || !tweet.isConnected) return;
         if (tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) return;
@@ -1127,15 +1170,18 @@
             if (btn) log.info('Download-Button eingefügt für Tweet ' + getTweetId(tweet));
             // Medien-URLs im Hintergrund vorladen, sobald der Tweet sichtbar ist
             observeForPrefetch(tweet);
-        } else if (!tweet.dataset.xloaderRechecked) {
-            tweet.dataset.xloaderRechecked = '1';
-            setTimeout(function () {
-                if (tweet.isConnected && !tweet.querySelector('button[' + CONFIG.btnAttribute + ']') &&
-                    hasMediaIndicator(tweet)) {
-                    createButton(tweet);
-                    observeForPrefetch(tweet);
-                }
-            }, CONFIG.recheckDelayMs);
+        } else {
+            // Medien können nachgeladen werden (z. B. Lazy-Loading) — Recheck
+            // bis zu MAX_TWEET_RECHECKS Mal, dann aufgeben.
+            var rechecks = parseInt(tweet.dataset.xloaderRechecked || '0', 10);
+            if (rechecks < MAX_TWEET_RECHECKS) {
+                tweet.dataset.xloaderRechecked = String(rechecks + 1);
+                setTimeout(function () {
+                    if (tweet.isConnected && !tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) {
+                        processTweet(tweet);
+                    }
+                }, CONFIG.recheckDelayMs);
+            }
         }
     }
 
@@ -1190,7 +1236,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.11 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.12 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
