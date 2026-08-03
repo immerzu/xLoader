@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.12
+// @version      1.0.15
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Der Speichern-Dialog-Modus und der Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,35 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.12 (Fehlerbehebungen)
+ * xLoader v1.0.15 (Artikel-Card-Bilder)
+ * ---------------------------------------------------------------------------
+ * v1.0.15:
+ *  - Fix: Bilder von Artikel-Cards (verlinkte Artikel) wurden nicht geladen —
+ *    sie liegen auf pbs.twimg.com/card_img/... (nicht pbs.twimg.com/media/)
+ *    und wurden gefiltert; außerdem fehlte der Medien-Indikator, sodass bei
+ *    solchen Tweets gar kein Download-Button erschien. card_img wird jetzt
+ *    als Medium erkannt und heruntergeladen (beste Auflösung via srcset).
+ * ---------------------------------------------------------------------------
+ * v1.0.14 (mehrere Medien pro Tweet)
+ * ---------------------------------------------------------------------------
+ * v1.0.14:
+ *  - Fix: Bei Tweets mit eingebetteten Medien (Quoted-/Link-Cards auf
+ *    Detailseiten) wurde der falsche Tweet adressiert: getTweetId nahm den
+ *    ersten Zeitstempel (äußerer Tweet), obwohl die sichtbaren Poster zum
+ *    eingebetteten Tweet gehörten. getTweetId/getHandle orientieren sich
+ *    jetzt am Medien-Element (findMediaElement) und dessen /status/-Link.
+ *  - Fix: Es wurden nicht mehr ALLE sichtbaren Medien eines Tweets geladen —
+ *    nur noch die, die die X-API liefert. X.com kürzt Medien in Konversations-
+ *    Antworten (v. a. Videos verlinkter Tweets). Jetzt werden die API-Medien
+ *    um die im DOM sichtbaren Poster/Standbilder ergänzt (mergeDomItems, mit
+ *    Dedup: gleiche Media-ID oder URL-Basis) — auch bei Cache-Treffern.
+ *  - Neu: Echte Video-MP4s für Poster, die die API nicht liefert: Das Poster
+ *    wird angetippt (X.com startet die Wiedergabe), die Voll-MP4 wird aus dem
+ *    Performance-Buffer gelesen (video.twimg.com/amplify_video/<id>/vid/avc1/
+ *    0/0/<res>/<hash>.mp4) und das Video sofort stummgeschaltet/pausiert.
+ *    Schlägt das fehl, bleibt das Poster als Bild-Notnagel.
+ * ---------------------------------------------------------------------------
+ * v1.0.12 (Fehlerbehebungen)
  * ---------------------------------------------------------------------------
  * v1.0.12:
  *  - Fix: normalizeMediaUrl akzeptierte wieder ALLE URLs — der isMediaUrl-
@@ -301,7 +329,14 @@
             return false;
         }
         if (url.indexOf('pbs.twimg.com/media/') !== -1) return true;
+        // Artikel-Card-Bilder (verlinkte Artikel, pbs.twimg.com/card_img/...)
+        if (url.indexOf('pbs.twimg.com/card_img/') !== -1) return true;
         if (url.indexOf('video.twimg.com/') !== -1) return true;
+        // Video-Poster als Medien akzeptieren (letzter Notnagel: Standbilder,
+        // wenn die X-API die echten Videos nicht liefert — z. B. bei gekürzten
+        // Konversations-Antworten). tweet_video_thumb wird von
+        // normalizeMediaUrl vorher in die echte GIF-MP4 umgebaut.
+        if (/pbs\.twimg\.com\/(amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb)\//.test(url)) return true;
         return false;
     }
 
@@ -414,19 +449,27 @@
     }
 
     /**
+     * Liefert das erste Medien-Element eines Tweets (Bild oder Video-Poster).
+     * Wird von hasMediaIndicator und getTweetId genutzt.
+     */
+    function findMediaElement(tweet) {
+        var imgs = tweet.querySelectorAll('img');
+        for (var i = 0; i < imgs.length; i++) {
+            var src = (imgs[i].getAttribute('src') || '') + ' ' + (imgs[i].getAttribute('srcset') || '');
+            if (src.indexOf('pbs.twimg.com/media/') !== -1) return imgs[i];
+            if (src.indexOf('pbs.twimg.com/card_img/') !== -1) return imgs[i];
+            if (/amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb/.test(src)) return imgs[i];
+        }
+        return tweet.querySelector('video') || null;
+    }
+
+    /**
      * Medien-Indikator für die Button-Injektion: true, wenn der Tweet Bilder
      * (pbs.twimg.com/media) ODER Video-/GIF-Poster (amplify_video_thumb,
      * ext_tw_video_thumb, tweet_video_thumb) ODER ein <video>-Element trägt.
      */
     function hasMediaIndicator(tweet) {
-        var imgs = tweet.querySelectorAll('img');
-        for (var i = 0; i < imgs.length; i++) {
-            var src = (imgs[i].getAttribute('src') || '') + ' ' + (imgs[i].getAttribute('srcset') || '');
-            if (src.indexOf('pbs.twimg.com/media/') !== -1) return true;
-            if (/amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb/.test(src)) return true;
-        }
-        if (tweet.querySelector('video')) return true;
-        return false;
+        return !!findMediaElement(tweet);
     }
 
     // ============================ X-API (Video-/GIF-URLs) =================
@@ -780,13 +823,31 @@
     // ============================ Metadaten (Dateiname) ====================
 
     function getHandle(tweet) {
-        var userLink = tweet.querySelector('div[data-testid="User-Name"] a[href^="/"]');
+        // Bevorzugt den User-Name-Bereich, der zum Medien-Element gehört
+        // (bei eingebetteten Tweets kann der erste User-Name der des äußeren
+        // Tweets sein).
+        var mediaEl = findMediaElement(tweet);
+        var userScope = mediaEl ? (mediaEl.closest('div[data-testid="User-Name"]') || null) : null;
+        var scope = userScope || tweet;
+        var userLink = scope.querySelector('div[data-testid="User-Name"] a[href^="/"]');
         var href = userLink ? (userLink.getAttribute('href') || '') : '';
         var m = href.match(/^\/([^/?#]+)/);
         return m ? m[1] : 'unknown';
     }
 
     function getTweetId(tweet) {
+        // 0) Medien-Element: dessen /status/-Link gehört zum Medien-Tweet.
+        //    Wichtig bei eingebetteten Tweets (Quoted-/Link-Cards auf Detail-
+        //    seiten), wo der erste Zeitstempel den ÄUSSEREN Tweet liefert und
+        //    sonst der falsche Tweet (bzw. nur dessen erstes Medium) geladen
+        //    würde.
+        var mediaEl = findMediaElement(tweet);
+        if (mediaEl) {
+            var mediaLink = mediaEl.closest('a[href*="/status/"]');
+            var mm0 = mediaLink ? (mediaLink.getAttribute('href') || '').match(/\/status\/(\d+)/) : null;
+            if (mm0) return mm0[1];
+        }
+
         // 1) Zeitstempel-Link: zeigt garantiert auf die Haupt-Tweet-ID
         var timeEl = tweet.querySelector('time');
         var timeLink = timeEl ? timeEl.closest('a[href*="/status/"]') : null;
@@ -821,6 +882,16 @@
         var fmtMatch = url.match(/[?&]format=([a-z0-9]+)/i);
         if (fmtMatch) return fmtMatch[1].toLowerCase();
         return 'jpg';
+    }
+
+    /**
+     * Extrahiert die Media-ID aus einer X.com-Medien-URL (amplify_video,
+     * ext_tw_video, tweet_video ...). Dient der Deduplizierung: Ein Poster,
+     * dessen Video die API bereits liefert, wird nicht doppelt geladen.
+     */
+    function mediaIdOf(url) {
+        var m = String(url).match(/(?:amplify_video|ext_tw_video|tweet_video)[^/]*\/([A-Za-z0-9_-]+)/);
+        return m ? m[1] : null;
     }
 
     // ============================ Download-Mechanismus ====================
@@ -948,6 +1019,108 @@
     var lastApiStatus = null;
 
     /**
+     * URL-Basis ohne Query/Hash und ohne Dateiendung — für die Deduplizierung
+     * (die API liefert z. B. ".../X.jpg?name=orig", das DOM ".../X?format=jpg&
+     * name=900x900" — beides ist dasselbe Bild).
+     */
+    function normBase(url) {
+        return String(url).split('?')[0].split('#')[0].replace(/\.(jpe?g|png|gif|webp|mp4)$/i, '');
+    }
+
+    function findPosterElementByMediaId(tweet, mediaId) {
+        if (!mediaId) return null;
+        var imgs = tweet.querySelectorAll('img');
+        for (var i = 0; i < imgs.length; i++) {
+            var src = (imgs[i].getAttribute('src') || '') + ' ' + (imgs[i].getAttribute('srcset') || '');
+            if (src.indexOf('_thumb/' + mediaId) !== -1) return imgs[i];
+        }
+        return null;
+    }
+
+    /**
+     * Findet die echte Video-MP4 eines Posters, indem das Poster angetippt wird
+     * (X.com startet die Wiedergabe) und die URL aus dem Performance-Buffer
+     * gelesen wird. X.com lädt dabei die Voll-MP4 (vid/avc1/0/0/...mp4), deren
+     * Hash nirgendwo sonst verfügbar ist (API liefert ihn nicht). Das Video
+     * wird sofort stummgeschaltet und pausiert.
+     */
+    async function resolvePosterVideoUrl(tweet, mediaId) {
+        var posterEl = findPosterElementByMediaId(tweet, mediaId);
+        if (!posterEl || !posterEl.isConnected) return null;
+        // Nur für amplify/ext_tw-Poster — tweet_video_thumb (GIFs) sind schon
+        // in echte MP4-URLs umgebaut (normalizeMediaUrl).
+        var src = (posterEl.getAttribute('src') || '') + ' ' + (posterEl.getAttribute('srcset') || '');
+        if (src.indexOf('tweet_video_thumb') !== -1) return null;
+
+        try {
+            var player = posterEl.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], div[role="button"]') || posterEl.parentElement;
+            if (!player) return null;
+            performance.clearResourceTimings();
+            player.click();
+
+            var deadline = Date.now() + 5000;
+            while (Date.now() < deadline) {
+                var entries = performance.getEntriesByType('resource');
+                for (var i = entries.length - 1; i >= 0; i--) {
+                    var u = entries[i].name;
+                    if (u.indexOf('video.twimg.com/amplify_video/' + mediaId + '/vid/avc1/') !== -1 &&
+                        /\.mp4(\?|$)/.test(u) && u.indexOf('.m4s') === -1 && u.indexOf('.m3u8') === -1) {
+                        // Video stumm + pausiert, damit keine Wiedergabe hörbar ist
+                        var article = posterEl.closest('article[data-testid="tweet"]');
+                        if (article) {
+                            var vids = article.querySelectorAll('video');
+                            for (var v = 0; v < vids.length; v++) { vids[v].muted = true; vids[v].pause(); }
+                        }
+                        return u;
+                    }
+                }
+                await new Promise(function (r) { setTimeout(r, 300); });
+            }
+        } catch (e) { /* Stille ignorieren — Poster bleibt dann Bild-Notnagel */ }
+        return null;
+    }
+
+    /**
+     * Ergänzt API-Medien um die im DOM sichtbaren Poster/Standbilder, die die
+     * API nicht liefert (X.com kürzt Medien in Konversations-Antworten). Für
+     * Video-Poster wird versucht, die echte MP4 per Wiedergabe-Resolver zu
+     * finden; sonst bleibt das Poster als Bild-Notnagel. Überspringt Medien,
+     * die bereits vorhanden sind (gleiche Media-ID oder URL-Basis). Idempotent.
+     */
+    async function mergeDomItems(tweet, items) {
+        var result = items.slice();
+        var domUrls = extractDomMedia(tweet);
+        for (var d = 0; d < domUrls.length; d++) {
+            var domUrl = domUrls[d];
+            var domId = mediaIdOf(domUrl);
+            var domBase = normBase(domUrl);
+            var duplicate = false;
+            for (var k = 0; k < result.length; k++) {
+                var it = result[k];
+                var itId = mediaIdOf(it.url);
+                var itBase = normBase(it.url);
+                if ((domId && domId === itId) || domBase === itBase) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) continue;
+            // Für Video-Poster die echte MP4 versuchen (nur wenn das Poster
+            // selbst nicht schon als MP4 vorliegt, z. B. GIFs).
+            var resolved = null;
+            if (domUrl.indexOf('.mp4') === -1 && domUrl.indexOf('tweet_video/') === -1) {
+                resolved = await resolvePosterVideoUrl(tweet, domId);
+            }
+            if (resolved) {
+                result.push({ url: resolved, ext: 'mp4' });
+            } else {
+                result.push({ url: domUrl, ext: extFromUrl(domUrl) });
+            }
+        }
+        return result;
+    }
+
+    /**
      * Live-Fallback für den Klick (Cache-Miss): API -> Live-Token-Retry ->
      * DOM (Bilder). Liefert ein Array von { url, ext }.
      */
@@ -982,14 +1155,8 @@
             }
         }
 
-        if (!items.length) {
-            var domUrls = extractDomMedia(tweet);
-            for (var d = 0; d < domUrls.length; d++) {
-                items.push({ url: domUrls[d], ext: extFromUrl(domUrls[d]) });
-            }
-        }
-        return items;
-    }
+        // DOM-Medien ergänzen (Poster/Standbilder, die die API nicht liefert)
+        return mergeDomItems(tweet, items);    }
 
     /**
      * Klick-Fluss: 1) Cache prüfen (Treffer -> sofortiger Download, kein
@@ -1011,6 +1178,9 @@
             if (mediaCache.has(tweetId)) mediaCache.delete(tweetId); // abgelaufen
             items = await loadItemsLive(tweet, tweetId);
         }
+        // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
+        // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
+        items = await mergeDomItems(tweet, items || []);
 
         if (!items.length) {
             setBusy(btn, false);
@@ -1236,7 +1406,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.12 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.15 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
