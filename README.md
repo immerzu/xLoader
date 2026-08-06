@@ -75,3 +75,24 @@ Git-Tags: v1.0.6 – v1.0.12, v1.0.15, v1.0.16 (v1.0.13/v1.0.14 wurden nie verö
 ## License / Lizenz
 
 MIT — see [LICENSE](LICENSE) (or `@license MIT` in the script metadata block). / MIT — siehe [LICENSE](LICENSE) (bzw. `@license MIT` im Skript-Metadatenblock).
+
+## Русская версия / Russian version
+
+**Русский:** xLoader — бесплатный юзерскрипт с открытым исходным кодом (MIT) для Tampermonkey, который добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter. Один клик — и открывается стандартный диалог «Сохранить как» со всеми медиафайлами твита.
+
+**Установка:**
+1. Установите [Tampermonkey](https://www.tampermonkey.net/) (Chrome/Edge/Firefox).
+2. Установите скрипт: откройте [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey предложит установку. (Альтернатива: склонируйте репозиторий и импортируйте файл через панель Tampermonkey.)
+3. Откройте [x.com](https://x.com) — под каждым твитом с медиа появится кнопка загрузки в панели действий.
+
+**Возможности:**
+- **Изображения, видео и GIF** — одна кнопка на твит; по умолчанию диалог «Сохранить как» открывается для первого медиа (настраивается: все медиа через меню Tampermonkey).
+- **Мгновенный диалог:** URL медиа предзагружаются в фоне (только для видимых твитов, через IntersectionObserver) — диалог появляется сразу после клика.
+- **Надёжное извлечение URL:** X.com показывает видео/GIF только как постеры — xLoader объединяет X API (`conversation.json`, повторный запрос live-токена при ошибках авторизации) с видимыми DOM-медиа (постеры, изображения карточек статей `card_img`) и определяет реальные MP4-URL через performance buffer воспроизведения.
+- **Имена файлов:** по умолчанию `@{handle}_{tweetId}_{index}.{ext}` (например `@elonmusk_123456789_1.mp4`) — настраивается через меню Tampermonkey: плейсхолдеры `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
+- **Меню Tampermonkey:** переключение режима «Сохранить как» (только первое медиа / все), смена шаблона имени файла и очистка кэша медиа.
+- Нет аналитики, нет внешних зависимостей, нет сервера.
+
+**Технические детали:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`, гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`. Цепочка при клике (кэш-промах): X API → повторный запрос live-токена → объединение DOM (постеры, изображения карточек; видео-MP4 через performance buffer) → сообщение об ошибке. Без внешних зависимостей и серверов.
+
+**Лицензия:** MIT — см. [LICENSE](LICENSE) (или `@license MIT` в метаданных скрипта).
