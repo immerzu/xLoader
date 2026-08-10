@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.20
+// @version      1.0.21
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar. / Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu. / Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
 // @author       xLoader
 // @license      MIT
@@ -25,7 +25,15 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.20 (dreisprachige Kurzbeschreibung)
+ * xLoader v1.0.21 (DOM-Fallback-Reparatur)
+ * ---------------------------------------------------------------------------
+ * v1.0.21:
+ *  - Fix: extractDomMedia verwarf ALLE Medien des eigenen Tweets — der Guard
+ *    filterte auf div[data-testid="tweet"] (den Body-Container, in dem auch
+ *    die Medien liegen) statt auf eingebettete Tweets. DOM-Fallback und
+ *    mergeDomItems (DOM-Poster/Standbilder ergänzen) waren damit funktionslos.
+ *    Der Guard prüft jetzt gegen das nächstgelegene article[data-testid="tweet"]:
+ *    eingebettete Tweets werden ausgeschlossen, die eigenen Medien gefunden.
  * ---------------------------------------------------------------------------
  * v1.0.20:
  *  - Kurzbeschreibung (@description) jetzt EN/DE/RU — die Greasy-Fork-Skript-
@@ -442,7 +450,13 @@
         var candidates = tweet.querySelectorAll(CONFIG.mediaSelectors.join(','));
         for (var i = 0; i < candidates.length; i++) {
             var el = candidates[i];
-            if (el.closest('div[data-testid="tweet"]')) continue;
+            // Elemente in EINGEBETTETEN Tweets überspringen (deren nächst-
+            // gelegenes article ist nicht der Ziel-Tweet). Der eigene Body-
+            // Container div[data-testid="tweet"] ist dagegen normal — dort
+            // liegen auch die Medien (tweetPhoto/videoPlayer); ein Filter auf
+            // div[data-testid="tweet"] würde ALLE Medien des eigenen Tweets
+            // verwerfen und den DOM-Fallback/mergeDomItems lahmlegen.
+            if (el.closest('article[data-testid="tweet"]') !== tweet) continue;
 
             if (el.tagName === 'IMG') {
                 add(bestImageUrl(el));
@@ -460,7 +474,7 @@
         var containers = tweet.querySelectorAll(CONFIG.containerSelector);
         for (var c = 0; c < containers.length; c++) {
             var box = containers[c];
-            if (box.closest('div[data-testid="tweet"]')) continue;
+            if (box.closest('article[data-testid="tweet"]') !== tweet) continue;
             var bgUrls = urlsFromStyle(box);
             for (var b = 0; b < bgUrls.length; b++) add(bgUrls[b]);
             for (var d = 0; d < CONFIG.dataUrlAttrs.length; d++) {
@@ -1486,7 +1500,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.20 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.21 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
