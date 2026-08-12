@@ -70,8 +70,13 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.16** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.21** — the full changelog lives in the comment at the top of `xLoader.user.js`.
 
+- **v1.0.21** — DOM-fallback fix: `extractDomMedia` discarded all media of the own tweet (the guard checked the body container `div[data-testid="tweet"]` instead of embedded tweets); DOM fallback and `mergeDomItems` work again.
+- **v1.0.20** — short description now trilingual DE/EN/RU in `@description` (`:de`/`:ru` lines removed).
+- **v1.0.19** — metadata descriptions unified to the Greasy Fork i18n format (EN + `@description:de` + `@description:ru`).
+- **v1.0.18** — trilingual description EN/DE/RU (`@description` + `description.md` for Greasy Fork).
+- **v1.0.17** — bilingual description (`@description` EN+DE) for the Greasy Fork script page.
 - **v1.0.16** — configurable filename template (Tampermonkey menu, persisted in localStorage).
 - **v1.0.15** — article-card images (`card_img`) + multi-media fix: media-based tweet ID, DOM/API merge with dedup, video MP4 resolver (performance buffer).
 - **v1.0.12** — fixes: isMediaUrl regression (v1.0.9), GM_download timeout, no token retry on 429, prefetch retry guard, recheck up to 3×, GIF poster → MP4.
@@ -82,8 +87,13 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.16** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste Version: **v1.0.21** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
 
+- **v1.0.21** — DOM-Fallback-Fix: `extractDomMedia` verwarf alle Medien des eigenen Tweets (der Guard prüfte den Body-Container `div[data-testid="tweet"]` statt eingebettete Tweets); DOM-Fallback und `mergeDomItems` funktionieren wieder.
+- **v1.0.20** — Kurzbeschreibung jetzt dreisprachig DE/EN/RU in `@description` (`:de`/`:ru`-Zeilen entfernt).
+- **v1.0.19** — Metablock-Beschreibungen auf das Greasy-Fork-i18n-Format vereinheitlicht (EN + `@description:de` + `@description:ru`).
+- **v1.0.18** — Dreisprachige Beschreibung EN/DE/RU (`@description` + `description.md` für Greasy Fork).
+- **v1.0.17** — Zweisprachige Beschreibung (`@description` EN+DE) für die Greasy-Fork-Skriptseite.
 - **v1.0.16** — konfigurierbares Dateinamen-Muster (Tampermonkey-Menü, in localStorage gespeichert).
 - **v1.0.15** — Artikel-Card-Bilder (`card_img`) + Multi-Medien-Fix: medienbasierte Tweet-ID, DOM/API-Merge mit Dedup, Video-MP4-Resolver (Performance-Buffer).
 - **v1.0.12** — Fixes: isMediaUrl-Regression (v1.0.9), GM_download-Timeout, kein Token-Retry bei 429, Prefetch-Retry-Guard, Recheck bis 3×, GIF-Poster → MP4.
@@ -94,8 +104,13 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.16** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.21** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
 
+- **v1.0.21** — Исправление DOM-запасного пути: `extractDomMedia` отбрасывал все медиа собственного твита (проверка смотрела на контейнер `div[data-testid="tweet"]`, а не на встроенные твиты); DOM-запасной путь и `mergeDomItems` снова работают.
+- **v1.0.20** — Краткое описание теперь на трёх языках DE/EN/RU в `@description` (строки `:de`/`:ru` удалены).
+- **v1.0.19** — Описания в метаблоке приведены к формату i18n Greasy Fork (EN + `@description:de` + `@description:ru`).
+- **v1.0.18** — Трёхъязычное описание EN/DE/RU (`@description` + `description.md` для Greasy Fork).
+- **v1.0.17** — Двуязычное описание (`@description` EN+DE) для страницы скрипта на Greasy Fork.
 - **v1.0.16** — настраиваемый шаблон имени файла (меню Tampermonkey, сохраняется в localStorage).
 - **v1.0.15** — изображения карточек статей (`card_img`) + исправление нескольких медиа: ID твита на основе медиа, объединение DOM/API с дедупликацией, резолвер видео-MP4 (performance buffer).
 - **v1.0.12** — исправления: регрессия isMediaUrl (v1.0.9), таймаут GM_download, без повторного запроса токена при 429, защита повторного prefetch, повторная проверка до 3×, GIF-постер → MP4.
@@ -106,7 +121,7 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16 (v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21 (v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## License / Lizenz / Лицензия
 
