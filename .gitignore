@@ -6,3 +6,6 @@ node_modules/
 
 # Temporäre Testdateien
 _tmp_*
+
+# Versionskopien (Ausgabe-Ordner, nie committen)
+Ausgabe/
