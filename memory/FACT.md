@@ -1,13 +1,13 @@
-# xLoader — FACT SHEET (Stand: v1.0.22, 2026-09-05)
+# xLoader — FACT SHEET (Stand: v1.0.23, 2026-09-06)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.22 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.23 dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, 1520 Zeilen, `@version 1.0.22`)
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, 1531 Zeilen, `@version 1.0.23`)
 - **Versionsarchive:** `Ausgabe\xLoader-v1.0.X.js` — Bindestrich-Schema mit echter `@version` (seit 12.08.2026; vorher `xLoader_v1.0.X.js` / `Downloadhilfe_v*.js` im Repo-Root). `Ausgabe/` ist gitignored, Archive bleiben **untracked und werden NIE committet**.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -17,8 +17,9 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Zweck:** Ein Download-Button pro Tweet mit Medien; ein Klick öffnet den nativen „Speichern unter“-Dialog (Bilder, Videos, GIFs). Medien-URLs werden im Hintergrund vorgeladen (sofortiger Dialog).
 - **Git-Stand (05.09.2026):** Arbeitsbaum sauber, HEAD `e71eaae` (v1.0.22-Doku). 11 GitHub-Releases.
 
-## Aktueller Stand (v1.0.22)
+## Aktueller Stand (v1.0.23)
 
+- **v1.0.23** — Kurzbeschreibung lokalisiert: `@description` = deutsche Default-Zeile (= GF-Skript-Locale `de`) + `@description:en` + `@description:ru`. Grund: Die GF-Suche filtert standardmäßig nach Sprache (Quellcode-belegt: greasyfork-org/greasyfork `script.rb` `set_locale`/`update_localized_attribute`, `script_indexing.rb:131`, `script_listings.rb` `filter_locale`) — die einzeilige DE/EN/RU-Mischbeschreibung (v1.0.20–22) machte das Skript nur in der **deutschen** Suche auffindbar (Live-Test: EN-Suche fand xLoader nicht). Mit Lokalisierung erscheint es in DE/EN/RU-Suchen. Kein `@description:de` (wird bei Locale `de` ignoriert), keine `@name:xx`-Zeilen. Init-Log + Changelog-Kopf auf v1.0.23.
 - **v1.0.22** — Projekt-Umzug: Repo liegt jetzt unter `F:\001_Coding_Projekte\xLoader` (vorher „Downloadhilfe“); Pfade/Verweise (Skills, Memory, Doku) aktualisiert. README: Platzhalter `{id}` korrigiert (statt `{tweetId}`), „How it works“ + neuer „Development“-Abschnitt (dreisprachig). ru-board-Post auf v1.0.21 aktualisiert.
 - **v1.0.21** — Fix DOM-Fallback: `extractDomMedia` verwarf ALLE Medien des eigenen Tweets — der Guard filterte auf `div[data-testid="tweet"]` (Body-Container) statt auf eingebettete Tweets. Guard prüft jetzt gegen das nächstgelegene `article[data-testid="tweet"]`.
 - Live auf X.com verifizierte Hintergrund-Tatsache: **`window.__INITIAL_STATE__` existiert nicht mehr**; X.com rendert Videos/GIFs nur als Poster-`<img>`, echte MP4-URLs liefert nur die X-API.
@@ -26,7 +27,7 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 ## Metablock & Greasy-Fork-Format (WICHTIG)
 
 - **`@match`:** `https://x.com/*` und `https://twitter.com/*`; **Grants:** `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; **`@connect`:** `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`; **`@noframes`, `@run-at document-end`, `@license MIT`.**
-- **`@description`-Format (seit v1.0.20):** einzeilig dreisprachig DE / EN / RU, Sprachen durch ` / ` getrennt (z. B. `…konfigurierbar. / Adds … / Добавляет…`). Vor v1.0.20: v1.0.19 = EN + `@description:de` + `@description:ru` (GF-i18n), davor zweisprachig.
+- **`@description`-Format (seit v1.0.23):** **lokalisiert** — `@description` = deutsche Kurzbeschreibung (Default; entspricht der GF-Skript-Locale `de` von xLoader) + `@description:en` + `@description:ru` (je eigene Zeile). Damit ist das Skript in der GF-Suche unter DE/EN/RU auffindbar. **Kein** `@description:de` (wird bei Skript-Locale `de` von GF ignoriert), keine `@name:xx`-Zeilen ohne passendes `@description:xx` (GF-Validierung), keine einzeiligen DE/EN/RU-Mischtexte (v1.0.20–22: machten das Skript nur in EINER Sprache auffindbar). Vor v1.0.20: v1.0.19 = EN + `@description:de` + `@description:ru` (GF-i18n), davor zweisprachig.
 - **`description.md`** (Repo-Root): Quelle für Greasy Fork „Zusätzliche Informationen“ — DE → RU → EN, jeweils ein Absatz, KEINE Flaggen-Überschriften; im GF-Admin als zusätzliche Sync-Quelle hinterlegt (Format **markdown**).
 - **GF-Admin-Falle:** es gibt ZWEI Sync-Felder mit gleichem Platzhalter „(Internetadresse)“: `script[sync_identifier]` = Skript-URL (`…/xLoader.user.js`) vs. `additional_info_sync[0][sync_identifier]` = Beschreibungsdatei (`…/description.md`). Nicht verwechseln — falsches Feld synchronisiert das Skript aus der Beschreibungsdatei.
 
@@ -111,12 +112,13 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 - **v1.0.17–v1.0.20** – Beschreibungs-Updates (nur Doku, ohne Git-Tag): zweisprachig → GF-i18n → einzeilig dreisprachig
 - **v1.0.21** – Fix DOM-Fallback (Guard `article[data-testid="tweet"]`)
 - **v1.0.22** – Projekt-Umzug nach `F:\001_Coding_Projekte\xLoader`; README/ru-board-Post aktualisiert
+- **v1.0.23** – Kurzbeschreibung lokalisiert (@description DE-Default + :en + :ru) für GF-Suchbarkeit in DE/EN/RU
 
 **Git-Tags:** v1.0.6–v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22 (v1.0.13/v1.0.14 nie veröffentlicht; v1.0.17–v1.0.20 reine Beschreibungs-Updates ohne Tag). Latest Release: GitHub `immerzu/xLoader/releases` + Greasy Fork 589456.
 
 ## Build- & Release-Regeln (verbindlich)
 
-1. **Fix & Version** in `xLoader.user.js`: Metablock `@version` anheben (nie doppelt!); Changelog-Kommentar oben: neuen `v1.0.X:`-Block einfügen (Titel `xLoader v1.0.X (<Kurzname>)` + Bullet-Punkte, DE); Init-Log-Zeile aktualisieren: `log.info('xLoader v1.0.X aktiv — überwache ' + CONFIG.tweetSelector + ' …');` (aktuell L1512). Bei inhaltlichen Änderungen `@description` (dreisprachig) mitpflegen.
+1. **Fix & Version** in `xLoader.user.js`: Metablock `@version` anheben (nie doppelt!); Changelog-Kommentar oben: neuen `v1.0.X:`-Block einfügen (Titel `xLoader v1.0.X (<Kurzname>)` + Bullet-Punkte, DE); Init-Log-Zeile aktualisieren: `log.info('xLoader v1.0.X aktiv — überwache ' + CONFIG.tweetSelector + ' …');` (aktuell L1523). Bei Beschreibungsänderungen die **lokalisierte** `@description` mitpflegen (DE-Default + `:en` + `:ru`, s. o.).
 2. **Tests:** `node --check xLoader.user.js`; falls DOM-relevant zusätzlich `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` (liegt außerhalb dieses Repos, nur lokal).
 3. **Archivkopie:** `cp xLoader.user.js Ausgabe/xLoader-v1.0.X.js` — bleibt **untracked**, wird NIE committet.
 4. **Commit + Push** (Git Bash ok): `git add xLoader.user.js && git commit -m "v1.0.X: <Kurzbeschreibung>"` → `git push origin main` → **Webhook feuert → Greasy Fork aktualisiert automatisch**.
@@ -130,7 +132,7 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** (v1.0.22, 1520 Zeilen; Metablock + vollständiger Changelog oben) |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** (v1.0.23, 1531 Zeilen; Metablock + vollständiger Changelog oben) |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.js` (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |

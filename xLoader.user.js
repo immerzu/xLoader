@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.22
-// @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar. / Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu. / Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
+// @version      1.0.23
+// @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar.
+// @description:en Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu.
+// @description:ru Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
 // @author       xLoader
 // @license      MIT
 // @homepageURL  https://github.com/immerzu/xLoader
@@ -25,7 +27,16 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.22 (Projekt-Umzug nach xLoader)
+ * xLoader v1.0.23 (Kurzbeschreibung lokalisiert DE/EN/RU für GF-Suchbarkeit)
+ * ---------------------------------------------------------------------------
+ * v1.0.23:
+ *  - Kurzbeschreibung (@description) lokalisiert: deutsche Default-Zeile
+ *    (= GF-Skript-Locale de) + @description:en + @description:ru — das Skript
+ *    ist damit in der Greasy-Fork-Suche unter DE/EN/RU auffindbar. Grund: Die
+ *    GF-Suche filtert standardmäßig nach Sprache; die bisherige einzeilige
+ *    DE/EN/RU-Mischbeschreibung machte das Skript nur in der deutschen Suche
+ *    auffindbar (EN/RU-Suche: unsichtbar). Kein @description:de (wird bei
+ *    GF-Skript-Locale de ignoriert), keine @name:xx-Zeilen.
  * ---------------------------------------------------------------------------
  * v1.0.22:
  *  - Projektumzug: Repository liegt jetzt unter F:\001_Coding_Projekte\xLoader
@@ -1509,7 +1520,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.22 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.23 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

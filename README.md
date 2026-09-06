@@ -70,8 +70,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.22** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.23** — the full changelog lives in the comment at the top of `xLoader.user.js`.
 
+- **v1.0.23** — short description localized: German default `@description` (= Greasy Fork script locale `de`) + `@description:en` + `@description:ru` — the script is now findable in the Greasy Fork search under DE/EN/RU (GF language filter; the previous one-line DE/EN/RU mix made it visible only in the German search).
 - **v1.0.22** — project move: repository now lives under `F:\001_Coding_Projekte\xLoader` (previously `Downloadhilfe`); all paths/refs (skills, memory, docs) updated accordingly. README: placeholder corrected (`{id}` instead of `{tweetId}`), „How it works“ extended (`@connect`/`@noframes`/`@run-at`/`@updateURL`), new „Development“ section (trilingual). ru-board post: version bumped to v1.0.21.
 - **v1.0.21** — DOM-fallback fix: `extractDomMedia` discarded all media of the own tweet (the guard checked the body container `div[data-testid="tweet"]` instead of embedded tweets); DOM fallback and `mergeDomItems` work again.
 - **v1.0.20** — short description now trilingual DE/EN/RU in `@description` (`:de`/`:ru` lines removed).
@@ -88,8 +89,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.22** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste Version: **v1.0.23** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
 
+- **v1.0.23** — Kurzbeschreibung lokalisiert: deutsche Default-`@description` (= GF-Skript-Locale `de`) + `@description:en` + `@description:ru` — das Skript ist damit in der Greasy-Fork-Suche unter DE/EN/RU auffindbar (GF-Sprachfilter; die bisherige einzeilige DE/EN/RU-Mischbeschreibung machte es nur in der deutschen Suche sichtbar).
 - **v1.0.22** — Projekt-Umzug: Repository liegt jetzt unter `F:\001_Coding_Projekte\xLoader` (vorher `Downloadhilfe`); alle Pfade/Verweise (Skills, Memory, Doku) entsprechend aktualisiert. README: Platzhalter korrigiert (`{id}` statt `{tweetId}`), „How it works“ erweitert (`@connect`/`@noframes`/`@run-at`/`@updateURL`), neuer Abschnitt „Development“ (dreisprachig). ru-board-Post: Versionsstand auf v1.0.21 aktualisiert.
 - **v1.0.21** — DOM-Fallback-Fix: `extractDomMedia` verwarf alle Medien des eigenen Tweets (der Guard prüfte den Body-Container `div[data-testid="tweet"]` statt eingebettete Tweets); DOM-Fallback und `mergeDomItems` funktionieren wieder.
 - **v1.0.20** — Kurzbeschreibung jetzt dreisprachig DE/EN/RU in `@description` (`:de`/`:ru`-Zeilen entfernt).
@@ -106,8 +108,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.22** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.23** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
 
+- **v1.0.23** — Краткое описание локализовано: немецкое описание по умолчанию `@description` (= локаль скрипта Greasy Fork `de`) + `@description:en` + `@description:ru` — скрипт теперь находится в поиске Greasy Fork на DE/EN/RU (языковой фильтр GF; прежнее однострочное DE/EN/RU-описание делало его видимым только в немецком поиске).
 - **v1.0.22** — перенос проекта: репозиторий теперь находится в `F:\001_Coding_Projekte\xLoader` (ранее `Downloadhilfe`); все пути/ссылки (скиллы, память, документация) обновлены. README: исправлен плейсхолдер (`{id}` вместо `{tweetId}`), раздел «How it works» расширен (`@connect`/`@noframes`/`@run-at`/`@updateURL`), добавлен раздел «Development» (трёхъязычный). Пост на Ru.Board: версия обновлена до v1.0.21.
 - **v1.0.21** — Исправление DOM-запасного пути: `extractDomMedia` отбрасывал все медиа собственного твита (проверка смотрела на контейнер `div[data-testid="tweet"]`, а не на встроенные твиты); DOM-запасной путь и `mergeDomItems` снова работают.
 - **v1.0.20** — Краткое описание теперь на трёх языках DE/EN/RU в `@description` (строки `:de`/`:ru` удалены).
