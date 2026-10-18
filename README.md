@@ -70,7 +70,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.23** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.24** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+
+- **v1.0.24** — download fixes: quoted-tweet handle, recheck without action bar, local API status, shared video resolver, single DOM merge; robust error handling and a 5-minute stall watchdog; clearer `GM_download` errors. Tested: 13/13 fix, 11/11 DOM, 19/19 watchdog tests; portable Chrome and Yandex (Browser API).
 
 - **v1.0.23** — short description localized: German default `@description` (= Greasy Fork script locale `de`) + `@description:en` + `@description:ru` — the script is now findable in the Greasy Fork search under DE/EN/RU (GF language filter; the previous one-line DE/EN/RU mix made it visible only in the German search).
 - **v1.0.22** — project move: repository now lives under `F:\001_Coding_Projekte\xLoader` (previously `Downloadhilfe`); all paths/refs (skills, memory, docs) updated accordingly. README: placeholder corrected (`{id}` instead of `{tweetId}`), „How it works“ extended (`@connect`/`@noframes`/`@run-at`/`@updateURL`), new „Development“ section (trilingual). ru-board post: version bumped to v1.0.21.
@@ -89,7 +91,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.23** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste Version: **v1.0.24** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.24** — Download-Fixes: quoted-Tweet-Handle, Recheck ohne Aktionsleiste, lokaler API-Status, gemeinsamer Video-Resolver, einmaliger DOM-Merge; robuste Fehlerbehandlung und 5-Minuten-Stillstands-Watchdog; klarere `GM_download`-Fehler. Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome und Yandex (Browser-API).
 
 - **v1.0.23** — Kurzbeschreibung lokalisiert: deutsche Default-`@description` (= GF-Skript-Locale `de`) + `@description:en` + `@description:ru` — das Skript ist damit in der Greasy-Fork-Suche unter DE/EN/RU auffindbar (GF-Sprachfilter; die bisherige einzeilige DE/EN/RU-Mischbeschreibung machte es nur in der deutschen Suche sichtbar).
 - **v1.0.22** — Projekt-Umzug: Repository liegt jetzt unter `F:\001_Coding_Projekte\xLoader` (vorher `Downloadhilfe`); alle Pfade/Verweise (Skills, Memory, Doku) entsprechend aktualisiert. README: Platzhalter korrigiert (`{id}` statt `{tweetId}`), „How it works“ erweitert (`@connect`/`@noframes`/`@run-at`/`@updateURL`), neuer Abschnitt „Development“ (dreisprachig). ru-board-Post: Versionsstand auf v1.0.21 aktualisiert.
@@ -108,7 +112,9 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.23** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.24** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+
+- **v1.0.24** — исправления загрузки: handle для quoted-твитов, повторная проверка без панели действий, локальный статус API, общий видео-резолвер, однократный DOM-merge; надёжная обработка ошибок и 5-минутный watchdog; понятные ошибки `GM_download`. Проверено: 13/13 fix, 11/11 DOM, 19/19 watchdog; портативный Chrome и Yandex (Browser API).
 
 - **v1.0.23** — Краткое описание локализовано: немецкое описание по умолчанию `@description` (= локаль скрипта Greasy Fork `de`) + `@description:en` + `@description:ru` — скрипт теперь находится в поиске Greasy Fork на DE/EN/RU (языковой фильтр GF; прежнее однострочное DE/EN/RU-описание делало его видимым только в немецком поиске).
 - **v1.0.22** — перенос проекта: репозиторий теперь находится в `F:\001_Coding_Projekte\xLoader` (ранее `Downloadhilfe`); все пути/ссылки (скиллы, память, документация) обновлены. README: исправлен плейсхолдер (`{id}` вместо `{tweetId}`), раздел «How it works» расширен (`@connect`/`@noframes`/`@run-at`/`@updateURL`), добавлен раздел «Development» (трёхъязычный). Пост на Ru.Board: версия обновлена до v1.0.21.

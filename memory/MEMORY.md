@@ -8,7 +8,9 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [Lolo (Benutzer)](user_lolo.md) – Sprache, Tools, Präferenzen und projektübergreifende Arbeitsregeln
 - [Fakten](FACT.md) – dauerhaftes Projektwissen: Kerndaten, Architektur, Fallback-Kette, Release-Ablauf, Fallstricke
 - [Arbeitsjournal](JOURNAL.jsonl) – kurze chronologische Arbeitsnotizen und wichtige Sitzungsereignisse
-- [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – Übergabe-/Stand-Snapshot zum aktuellen Stand (v1.0.22)
+- [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – Übergabe-/Stand-Snapshot zum Stand v1.0.22
+- [HANDOVER v1.0.24](HANDOVER_v1.0.24.md) – **Einstieg für neue Agenten**: Release-Stand v1.0.24, Download-Fixes, Tests, Release-Nachweise
+- [HANDOVER v1.0.23 (vollständig)](HANDOVER_v1.0.23.md) – **Einstieg für neue Agenten**: kompletter Bericht (Architektur mit Zeilen v1.0.23, Datenflüsse, Tests, Release, Schwachstellen, Stand)
 
 ## Pflege-Regeln
 

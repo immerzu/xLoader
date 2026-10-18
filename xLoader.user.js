@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.23
+// @version      1.0.24
 // @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar.
 // @description:en Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu.
 // @description:ru Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
@@ -27,7 +27,22 @@
 // ==/UserScript==
 
 /*
- * xLoader v1.0.23 (Kurzbeschreibung lokalisiert DE/EN/RU für GF-Suchbarkeit)
+ * xLoader v1.0.24 (Download-Fixes, Watchdog, klarere Fehlermeldungen)
+ * ---------------------------------------------------------------------------
+ * v1.0.24:
+ *  - Zehn lokale Korrekturen übernommen: getHandle nutzt den Article des
+ *    Medien-Elements (quoted Tweets), Recheck auch bei fehlender Aktionsleiste,
+ *    loadItemsLive liefert {items, apiStatus} lokal, gemeinsamer
+ *    Video-Poster-Resolver mit einer 5-s-Deadline, mergeDomItems nur einmal,
+ *    try/catch/finally in onDownloadClick, failPrefetch ohne Retry bei
+ *    401/403/429, prefetchSeen-Freigabe nach Erfolg, gmGet mit Timeout,
+ *    releaseDetachedTweets und scheduleProcess mit closest-Filter.
+ *  - Download-Watchdog: 5-min-Stillstands-Timeout (onprogress setzt zurück),
+ *    abort() und klare Timeout-Meldung; keine starre Gesamtgrenze.
+ *  - Klarere GM_download-Fehler: not_enabled/not_permitted/not_whitelisted/
+ *    not_succeeded mit Handlungshinweis (Download-Modus auf Nativ/Browser-API).
+ *  - Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome
+ *    und Yandex (Browser-API).
  * ---------------------------------------------------------------------------
  * v1.0.23:
  *  - Kurzbeschreibung (@description) lokalisiert: deutsche Default-Zeile
@@ -733,6 +748,7 @@
                 GM_xmlhttpRequest({
                     method: 'GET',
                     url: url,
+                    timeout: CONFIG.requestTimeoutMs,
                     onload: function (r) {
                         if (r.status === 200) resolve(r.responseText);
                         else reject(new Error('HTTP ' + r.status));
@@ -835,13 +851,17 @@
             if (parsed.media && parsed.media.length) {
                 mediaCache.set(tweetId, { items: parsed.media, fetchedAt: Date.now() });
                 prefetchRetries.delete(tweetId);
+                // Freigeben, sobald der Cache den Tweet abdeckt: Nach Ablauf der
+                // TTL (5 min) und erneutem Sichtbarwerden darf wieder vorgeladen
+                // werden — der Cache-Guard verhindert Doppel-Prefetches vorher.
+                prefetchSeen.delete(tweetId);
                 log.info('Prefetch abgeschlossen für Tweet ' + tweetId +
                     ' (' + parsed.media.length + ' Medium/Medien).');
             } else {
                 failPrefetch(tweetId, 'leere Medien-Antwort');
             }
         } catch (err) {
-            failPrefetch(tweetId, err.message);
+            failPrefetch(tweetId, err.message, err.status);
         } finally {
             activePrefetches--;
             drainPrefetchQueue();
@@ -849,11 +869,19 @@
     }
 
     /**
-     * Behandelt einen fehlgeschlagenen Prefetch: max. MAX_PREFETCH_RETRIES
-     * automatische Versuche mit PREFETCH_RETRY_DELAY_MS Cooldown, danach
-     * Aufgeben (prefetchSeen bleibt gesetzt -> erst wieder nach einem Klick).
+     * Behandelt einen fehlgeschlagenen Prefetch.
+     * Auth- und Rate-Limit-Fehler (401/403/429) sind nicht transient: ein Retry
+     * nach 10 s scheitert am selben Token bzw. verschärft das Limit — der Klick
+     * lädt in diesen Fällen live nach (dort greift der Live-Token-Retry).
+     * Netzwerk-/Timeout-/Parse-Fehler und leere Antworten werden bis zu
+     * MAX_PREFETCH_RETRIES Mal mit PREFETCH_RETRY_DELAY_MS Cooldown wiederholt.
      */
-    function failPrefetch(tweetId, reason) {
+    function failPrefetch(tweetId, reason, status) {
+        if (status === 401 || status === 403 || status === 429) {
+            prefetchRetries.delete(tweetId);
+            log.warn('Prefetch für Tweet ' + tweetId + ' ohne Retry (HTTP ' + status + '): ' + reason);
+            return;
+        }
         var tries = (prefetchRetries.get(tweetId) || 0) + 1;
         if (tries >= MAX_PREFETCH_RETRIES) {
             prefetchRetries.delete(tweetId);
@@ -880,12 +908,13 @@
     // ============================ Metadaten (Dateiname) ====================
 
     function getHandle(tweet) {
-        // Bevorzugt den User-Name-Bereich, der zum Medien-Element gehört
-        // (bei eingebetteten Tweets kann der erste User-Name der des äußeren
-        // Tweets sein).
+        // Bevorzugt den Tweet, in dem das Medien-Element liegt: bei
+        // eingebetteten Tweets gehört der Dateiname zu deren Autor (getTweetId
+        // liefert ebenfalls die ID des eingebetteten Tweets). Ein closest() auf
+        // div[data-testid="User-Name"] greift nicht — dort liegen keine Medien.
         var mediaEl = findMediaElement(tweet);
-        var userScope = mediaEl ? (mediaEl.closest('div[data-testid="User-Name"]') || null) : null;
-        var scope = userScope || tweet;
+        var mediaArticle = mediaEl ? mediaEl.closest('article[data-testid="tweet"]') : null;
+        var scope = (mediaArticle && mediaArticle !== tweet) ? mediaArticle : tweet;
         var userLink = scope.querySelector('div[data-testid="User-Name"] a[href^="/"]');
         var href = userLink ? (userLink.getAttribute('href') || '') : '';
         var m = href.match(/^\/([^/?#]+)/);
@@ -960,23 +989,81 @@
      */
     function downloadUrl(url, filename, saveAs, onProgress) {
         return new Promise(function (resolve, reject) {
+            var settled = false;
+            var handle = null;
+            var lastActivity = Date.now();
+            // 5 Minuten Stillstand statt starrer 65 s: der native Modus liefert
+            // keinen onprogress, ein laufender 5-MB-Download über 75 s darf
+            // nicht abgebrochen werden. Mit onprogress wird der Timer bei
+            // jedem Fortschritt zurückgesetzt.
+            var watchdogMs = 5 * 60 * 1000;
+            var timer = null;
+
+            function fail(message) {
+                if (settled) return;
+                settled = true;
+                if (timer) clearTimeout(timer);
+                try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (e) {}
+                reject(new Error(message));
+            }
+
+            // Watchdog nur bei fehlender Aktivität: Ein laufender Download, der
+            // Fortschritt meldet, darf nicht an einer starren Gesamtgrenze
+            // scheitern. Ohne Download-Berechtigung hängt GM_download dagegen
+            // ohne Callback; dann greift der Timer nach watchdogMs.
+            function arm() {
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(function () {
+                    if (settled) return;
+                    if (Date.now() - lastActivity < watchdogMs) { arm(); return; }
+                    fail('GM_download: keine Antwort/Fortschritt (Timeout)');
+                }, watchdogMs);
+            }
+            arm();
+
+            function settle(fn) {
+                return function (arg) {
+                    if (settled) return;
+                    settled = true;
+                    if (timer) clearTimeout(timer);
+                    fn(arg);
+                };
+            }
+
             var opts = {
                 url: url,
                 name: filename,
                 saveAs: saveAs,
-                timeout: CONFIG.requestTimeoutMs,
-                onload: function () {
+                // Kein starrer Gesamt-Timeout: der Fortschritts-Watchdog unten
+                // übernimmt die Überwachung (große Videos können länger dauern).
+                timeout: 0,
+                onload: settle(function () {
                     resolve();
-                },
-                onerror: function (err) {
-                    reject(new Error('GM_download: ' + (err && err.error ? err.error : 'unbekannter Fehler')));
-                },
-                ontimeout: function () {
+                }),
+                onerror: settle(function (err) {
+                    var reason = err && err.error ? err.error : 'unbekannter Fehler';
+                    var hint = '';
+                    if (reason === 'not_enabled') hint = ' – Tampermonkey-Download ist deaktiviert (Download-Modus auf Nativ stellen)';
+                    else if (reason === 'not_permitted') hint = ' – keine Download-Berechtigung (Modus Nativ oder Berechtigung erteilen)';
+                    else if (reason === 'not_whitelisted') hint = ' – Dateiendung ist in Tampermonkey nicht erlaubt';
+                    else if (reason === 'not_succeeded') hint = ' – Download konnte nicht gestartet werden';
+                    reject(new Error('GM_download: ' + reason + hint));
+                }),
+                ontimeout: settle(function () {
                     reject(new Error('GM_download: Timeout'));
-                }
+                })
             };
-            if (typeof onProgress === 'function') opts.onprogress = onProgress;
-            GM_download(opts);
+            if (typeof onProgress === 'function') {
+                opts.onprogress = function (progress) {
+                    lastActivity = Date.now();
+                    onProgress(progress);
+                };
+            }
+            try {
+                handle = GM_download(opts);
+            } catch (err) {
+                fail('GM_download: ' + (err && err.message ? err.message : String(err)));
+            }
         });
     }
 
@@ -1124,9 +1211,6 @@
         if (badge) badge.style.display = 'none';
     }
 
-    // Letzter HTTP-Status der X-API beim Live-Fallback (für Fehlermeldungen)
-    var lastApiStatus = null;
-
     /**
      * URL-Basis ohne Query/Hash und ohne Dateiendung — für die Deduplizierung
      * (die API liefert z. B. ".../X.jpg?name=orig", das DOM ".../X?format=jpg&
@@ -1147,58 +1231,83 @@
     }
 
     /**
-     * Findet die echte Video-MP4 eines Posters, indem das Poster angetippt wird
-     * (X.com startet die Wiedergabe) und die URL aus dem Performance-Buffer
-     * gelesen wird. X.com lädt dabei die Voll-MP4 (vid/avc1/0/0/...mp4), deren
-     * Hash nirgendwo sonst verfügbar ist (API liefert ihn nicht). Das Video
-     * wird sofort stummgeschaltet und pausiert.
+     * Löst die echten Video-MP4s mehrerer Poster gemeinsam: alle Poster einmal
+     * antippen (X.com startet die Wiedergabe), dann den Performance-Buffer bis
+     * zu 5 s lang auswerten. Früher wurde pro Poster sequenziell bis zu 5 s
+     * gewartet — bei mehreren Video-Postern entsprechend länger; außerdem
+     * verwarf jedes clearResourceTimings() die bereits geladenen Einträge der
+     * vorherigen Poster. Die Wiedergabe wird in jedem Fall wieder gestoppt.
      */
-    async function resolvePosterVideoUrl(tweet, mediaId) {
-        var posterEl = findPosterElementByMediaId(tweet, mediaId);
-        if (!posterEl || !posterEl.isConnected) return null;
-        // Nur für amplify/ext_tw-Poster — tweet_video_thumb (GIFs) sind schon
-        // in echte MP4-URLs umgebaut (normalizeMediaUrl).
-        var src = (posterEl.getAttribute('src') || '') + ' ' + (posterEl.getAttribute('srcset') || '');
-        if (src.indexOf('tweet_video_thumb') !== -1) return null;
+    async function resolvePosterVideoUrls(tweet, mediaIds) {
+        var targets = [];
+        for (var i = 0; i < mediaIds.length; i++) {
+            var mediaId = mediaIds[i];
+            var posterEl = findPosterElementByMediaId(tweet, mediaId);
+            if (!posterEl || !posterEl.isConnected) continue;
+            var src = (posterEl.getAttribute('src') || '') + ' ' + (posterEl.getAttribute('srcset') || '');
+            // Nur für amplify/ext_tw-Poster — tweet_video_thumb (GIFs) sind schon
+            // in echte MP4-URLs umgebaut (normalizeMediaUrl).
+            if (src.indexOf('tweet_video_thumb') !== -1) continue;
+            var player = posterEl.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], div[role="button"]') || posterEl.parentElement;
+            if (!player) continue;
+            targets.push({ id: mediaId, player: player, url: null });
+        }
+        if (!targets.length) return {};
 
         try {
-            var player = posterEl.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], div[role="button"]') || posterEl.parentElement;
-            if (!player) return null;
             performance.clearResourceTimings();
-            player.click();
+            for (var c = 0; c < targets.length; c++) targets[c].player.click();
 
             var deadline = Date.now() + 5000;
-            while (Date.now() < deadline) {
+            var open = targets.length;
+            while (open > 0 && Date.now() < deadline) {
                 var entries = performance.getEntriesByType('resource');
-                for (var i = entries.length - 1; i >= 0; i--) {
-                    var u = entries[i].name;
-                    if (u.indexOf('video.twimg.com/amplify_video/' + mediaId + '/vid/avc1/') !== -1 &&
-                        /\.mp4(\?|$)/.test(u) && u.indexOf('.m4s') === -1 && u.indexOf('.m3u8') === -1) {
-                        // Video stumm + pausiert, damit keine Wiedergabe hörbar ist
-                        var article = posterEl.closest('article[data-testid="tweet"]');
-                        if (article) {
-                            var vids = article.querySelectorAll('video');
-                            for (var v = 0; v < vids.length; v++) { vids[v].muted = true; vids[v].pause(); }
+                for (var e = 0; e < entries.length; e++) {
+                    var u = entries[e].name;
+                    if (u.indexOf('/vid/avc1/') === -1 || !/\.mp4(\?|$)/.test(u) ||
+                        u.indexOf('.m4s') !== -1 || u.indexOf('.m3u8') !== -1) continue;
+                    for (var t = 0; t < targets.length; t++) {
+                        if (!targets[t].url && u.indexOf('amplify_video/' + targets[t].id + '/vid/avc1/') !== -1) {
+                            targets[t].url = u;
+                            open--;
                         }
-                        return u;
                     }
                 }
-                await new Promise(function (r) { setTimeout(r, 300); });
+                if (open > 0) {
+                    await new Promise(function (r) { setTimeout(r, 300); });
+                }
             }
-        } catch (e) { /* Stille ignorieren — Poster bleibt dann Bild-Notnagel */ }
-        return null;
+        } catch (e) { /* Stille ignorieren — Poster bleibt dann Bild-Notnagel */ } finally {
+            // Gestartete Wiedergaben in jedem Fall anhalten (auch bei Timeout)
+            for (var v = 0; v < targets.length; v++) {
+                var video = targets[v].player.querySelector('video');
+                if (video) {
+                    video.muted = true;
+                    video.pause();
+                }
+            }
+        }
+
+        var resolved = {};
+        for (var r = 0; r < targets.length; r++) {
+            if (targets[r].url) resolved[targets[r].id] = targets[r].url;
+        }
+        return resolved;
     }
 
     /**
      * Ergänzt API-Medien um die im DOM sichtbaren Poster/Standbilder, die die
-     * API nicht liefert (X.com kürzt Medien in Konversations-Antworten). Für
-     * Video-Poster wird versucht, die echte MP4 per Wiedergabe-Resolver zu
-     * finden; sonst bleibt das Poster als Bild-Notnagel. Überspringt Medien,
-     * die bereits vorhanden sind (gleiche Media-ID oder URL-Basis). Idempotent.
+     * API nicht liefert (X.com kürzt Medien in Konversations-Antworten).
+     * Video-Poster werden gemeinsam aufgelöst; bleibt die MP4 aus, bleibt das
+     * Poster als Bild-Notnagel. Überspringt Medien, die bereits vorhanden sind
+     * (gleiche Media-ID oder URL-Basis). Idempotent.
      */
     async function mergeDomItems(tweet, items) {
         var result = items.slice();
         var domUrls = extractDomMedia(tweet);
+        var pending = [];
+        var resolveIds = [];
+
         for (var d = 0; d < domUrls.length; d++) {
             var domUrl = domUrls[d];
             var domId = mediaIdOf(domUrl);
@@ -1206,49 +1315,53 @@
             var duplicate = false;
             for (var k = 0; k < result.length; k++) {
                 var it = result[k];
-                var itId = mediaIdOf(it.url);
-                var itBase = normBase(it.url);
-                if ((domId && domId === itId) || domBase === itBase) {
+                if ((domId && domId === mediaIdOf(it.url)) || domBase === normBase(it.url)) {
                     duplicate = true;
                     break;
                 }
             }
             if (duplicate) continue;
-            // Für Video-Poster die echte MP4 versuchen (nur wenn das Poster
-            // selbst nicht schon als MP4 vorliegt, z. B. GIFs).
-            var resolved = null;
-            if (domUrl.indexOf('.mp4') === -1 && domUrl.indexOf('tweet_video/') === -1) {
-                resolved = await resolvePosterVideoUrl(tweet, domId);
-            }
-            if (resolved) {
-                result.push({ url: resolved, ext: 'mp4' });
+            // GIFs liegen bereits als MP4 vor; nur echte Video-Poster auflösen.
+            var needsResolve = !!domId && domUrl.indexOf('.mp4') === -1 && domUrl.indexOf('tweet_video/') === -1;
+            pending.push({ url: domUrl, id: needsResolve ? domId : null });
+            if (needsResolve && resolveIds.indexOf(domId) === -1) resolveIds.push(domId);
+        }
+
+        var resolved = resolveIds.length ? await resolvePosterVideoUrls(tweet, resolveIds) : {};
+        for (var p = 0; p < pending.length; p++) {
+            var item = pending[p];
+            if (item.id && resolved[item.id]) {
+                result.push({ url: resolved[item.id], ext: 'mp4' });
             } else {
-                result.push({ url: domUrl, ext: extFromUrl(domUrl) });
+                result.push({ url: item.url, ext: extFromUrl(item.url) });
             }
         }
         return result;
     }
 
     /**
-     * Live-Fallback für den Klick (Cache-Miss): API -> Live-Token-Retry ->
-     * DOM (Bilder). Liefert ein Array von { url, ext }.
+     * Live-Fallback für den Klick (Cache-Miss): API -> Live-Token-Retry.
+     * Liefert { items, apiStatus } — der Fehlerstatus wird bewusst lokal
+     * zurückgegeben statt global gespeichert, damit parallele Klicks auf
+     * verschiedene Tweets sich die Fehlermeldung nicht überschreiben.
      */
-    async function loadItemsLive(tweet, tweetId) {
+    async function loadItemsLive(tweetId) {
         var items = [];
         var apiFailed = false;
+        var apiStatus = null;
         try {
             var data = await fetchTweetData(tweetId);
             items = parseApiData(data, tweetId).media;
         } catch (apiErr) {
             apiFailed = true;
-            lastApiStatus = apiErr.status || null;
+            apiStatus = apiErr.status || null;
             log.warn('API-Fehler (' + apiErr.message + ').');
         }
 
         // Live-Token-Retry auch bei bereits gecachtem (möglicherweise veraltetem)
         // Token versuchen — X.com rotiert diese Tokens regelmäßig; ein stale
         // Token würde sonst jeden 401-Fall blockieren (Videos/GIFs brechen).
-        if (!items.length && lastApiStatus !== 429 && (apiFailed || !liveToken)) {
+        if (!items.length && apiStatus !== 429 && (apiFailed || !liveToken)) {
             log.info('Versuche Live-Bearer-Token-Retry …');
             try {
                 var token = await fetchLiveBearerToken();
@@ -1258,19 +1371,22 @@
                     log.info('Live-Bearer-Token ermittelt.');
                     var data2 = await fetchTweetData(tweetId);
                     items = parseApiData(data2, tweetId).media;
+                    apiStatus = null; // zweiter Call war erfolgreich
                 }
             } catch (retryErr) {
                 log.warn('Live-Token-Retry fehlgeschlagen: ' + retryErr.message);
             }
         }
 
-        // DOM-Medien ergänzen (Poster/Standbilder, die die API nicht liefert)
-        return mergeDomItems(tweet, items);    }
+        return { items: items, apiStatus: apiStatus };
+    }
 
     /**
      * Klick-Fluss: 1) Cache prüfen (Treffer -> sofortiger Download, kein
-     * API-Call). 2) Cache-Miss -> Live-Fallback. 3) Download pro Medium mit
-     * saveAs: true. 4) Cache-Eintrag invalidieren.
+     * API-Call). 2) Cache-Miss -> Live-Fallback. 3) DOM-Poster/Standbilder
+     * genau einmal ergänzen. 4) Download pro Medium mit saveAs nach Modus.
+     * 5) Cache invalidieren. Fehler und Ausnahmen geben den Button in jedem
+     * Fall wieder frei (finally), sonst bliebe er dauerhaft gesperrt.
      */
     async function onDownloadClick(tweet, btn) {
         if (btn.disabled) return; // Doppelklick-Guard
@@ -1278,88 +1394,97 @@
 
         var tweetId = getTweetId(tweet);
         var handle = sanitizeFilenamePart(getHandle(tweet));
-        lastApiStatus = null;
-        var items = getCachedItems(tweetId);
-
-        if (items && items.length) {
-            log.info('Cache-Treffer für Tweet ' + tweetId + ' — sofortiger Download.');
-        } else {
-            if (mediaCache.has(tweetId)) mediaCache.delete(tweetId); // abgelaufen
-            items = await loadItemsLive(tweet, tweetId);
-        }
-        // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
-        // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
-        items = await mergeDomItems(tweet, items || []);
-
-        if (!items.length) {
-            setBusy(btn, false);
-            var msg = 'Keine Medien gefunden';
-            if (lastApiStatus === 429) {
-                msg = 'Rate-Limit (429) - kurz warten, dann erneut versuchen';
-            } else if (lastApiStatus === 401 || lastApiStatus === 403) {
-                msg = 'Zugriff verweigert (' + lastApiStatus + ')';
-            }
-            flashError(btn, msg);
-            log.warn('Keine Medien für Tweet ' + tweetId + ' gefunden (Cache + API + DOM). API-Status: ' + lastApiStatus);
-            return;
-        }
-
+        var items = [];
+        var apiStatus = null;
         var failed = 0;
-        for (var i = 0; i < items.length; i++) {
-            var filename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
-                handle: handle,
-                id: tweetId,
-                index: i + 1,
-                ext: items[i].ext
-            }));
-            var saveAs = (saveAsMode === 'all') || (i === 0);
-            // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
-            var isVideo = (items[i].ext === 'mp4');
-            try {
-                log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
-                await downloadUrl(items[i].url, filename, saveAs, function (progress) {
-                    // Badge nur bei Videodateien ab einer Mindestgröße — bei
-                    // Bildern und kurzen Videos wird nichts angezeigt.
-                    if (!progress || !isVideo) return;
-                    var total = Number(progress.total);
-                    if (!isFinite(total) || total < CONFIG.progressBadgeMinBytes) return;
-                    // Tampermonkey liefert { done, total } (Bytes) — percent
-                    // existiert dort nicht, wird aber unterstützt, falls ein
-                    // anderer Manager ihn liefert. done kann fehlen oder NaN
-                    // sein (z. B. unbekannte Gesamtgröße) — dann wird kein
-                    // Prozentwert angezeigt statt "NaN%".
-                    var pct = progress.percent;
-                    if (typeof pct !== 'number') {
-                        var done = Number(progress.done);
-                        if (isFinite(done) && isFinite(total) && total > 0) {
-                            pct = Math.round((done / total) * 100);
-                        }
-                    }
-                    if (typeof pct === 'number' && isFinite(pct)) {
-                        pct = Math.max(0, Math.min(100, Math.round(pct)));
-                        showProgress(btn, pct);
-                        btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
-                    }
-                });
-                log.info('Gespeichert: ' + filename);
-            } catch (err) {
-                failed++;
-                log.error('Download fehlgeschlagen (' + items[i].url + '): ' + err.message);
+        var errorMessage = null;
+
+        try {
+            var cached = getCachedItems(tweetId);
+            if (cached && cached.length) {
+                log.info('Cache-Treffer für Tweet ' + tweetId + ' — sofortiger Download.');
+                items = cached;
+            } else {
+                if (mediaCache.has(tweetId)) mediaCache.delete(tweetId); // abgelaufen
+                var live = await loadItemsLive(tweetId);
+                items = live.items;
+                apiStatus = live.apiStatus;
             }
-        }
-        hideProgress(btn);
+            // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
+            // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
+            items = await mergeDomItems(tweet, items);
 
-        // Cache invalidieren: X.com-URLs sind temporär; ein erneuter Klick
-        // lädt die Medien frisch (Live-Fallback). Zusätzlich prefetchSeen
-        // leeren, damit der Tweet beim nächsten Erscheinen wieder im
-        // Hintergrund vorgeladen werden kann (Cache füllen).
-        mediaCache.delete(tweetId);
-        prefetchSeen.delete(tweetId);
+            if (!items.length) {
+                errorMessage = 'Keine Medien gefunden';
+                if (apiStatus === 429) {
+                    errorMessage = 'Rate-Limit (429) - kurz warten, dann erneut versuchen';
+                } else if (apiStatus === 401 || apiStatus === 403) {
+                    errorMessage = 'Zugriff verweigert (' + apiStatus + ')';
+                }
+                log.warn('Keine Medien für Tweet ' + tweetId + ' gefunden (Cache + API + DOM). API-Status: ' + apiStatus);
+            } else {
+                for (var i = 0; i < items.length; i++) {
+                    var filename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
+                        handle: handle,
+                        id: tweetId,
+                        index: i + 1,
+                        ext: items[i].ext
+                    }));
+                    var saveAs = (saveAsMode === 'all') || (i === 0);
+                    // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
+                    var isVideo = (items[i].ext === 'mp4');
+                    try {
+                        log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
+                        await downloadUrl(items[i].url, filename, saveAs, function (progress) {
+                            // Badge nur bei Videodateien ab einer Mindestgröße — bei
+                            // Bildern und kurzen Videos wird nichts angezeigt.
+                            if (!progress || !isVideo) return;
+                            var total = Number(progress.total);
+                            if (!isFinite(total) || total < CONFIG.progressBadgeMinBytes) return;
+                            // Tampermonkey liefert { done, total } (Bytes) — percent
+                            // existiert dort nicht, wird aber unterstützt, falls ein
+                            // anderer Manager ihn liefert. done kann fehlen oder NaN
+                            // sein (z. B. unbekannte Gesamtgröße) — dann wird kein
+                            // Prozentwert angezeigt statt "NaN%".
+                            var pct = progress.percent;
+                            if (typeof pct !== 'number') {
+                                var done = Number(progress.done);
+                                if (isFinite(done) && isFinite(total) && total > 0) {
+                                    pct = Math.round((done / total) * 100);
+                                }
+                            }
+                            if (typeof pct === 'number' && isFinite(pct)) {
+                                pct = Math.max(0, Math.min(100, Math.round(pct)));
+                                showProgress(btn, pct);
+                                btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
+                            }
+                        });
+                        log.info('Gespeichert: ' + filename);
+                    } catch (err) {
+                        failed++;
+                        log.error('Download fehlgeschlagen (' + items[i].url + '): ' + err.message);
+                    }
+                }
 
-        setBusy(btn, false);
-        if (failed > 0) {
-            flashError(btn, failed + ' von ' + items.length + ' fehlgeschlagen');
+                // Cache invalidieren: X.com-URLs sind temporär; ein erneuter Klick
+                // lädt die Medien frisch (Live-Fallback). Zusätzlich prefetchSeen
+                // leeren, damit der Tweet beim nächsten Erscheinen wieder im
+                // Hintergrund vorgeladen werden kann (Cache füllen).
+                mediaCache.delete(tweetId);
+                prefetchSeen.delete(tweetId);
+
+                if (failed > 0) {
+                    errorMessage = failed + ' von ' + items.length + ' fehlgeschlagen';
+                }
+            }
+        } catch (err) {
+            errorMessage = 'Fehler beim Laden';
+            log.error('Download-Ablauf fehlgeschlagen (Tweet ' + tweetId + '): ' + (err && err.message ? err.message : err));
+        } finally {
+            hideProgress(btn);
+            setBusy(btn, false);
         }
+        if (errorMessage) flashError(btn, errorMessage);
     }
 
     // ============================ Button-Injektion =========================
@@ -1442,8 +1567,41 @@
         prefetchObserver.observe(tweet);
     }
 
+    /**
+     * Entfernte Tweets aus dem IntersectionObserver lösen: X.com hängt Artikel
+     * beim Scrollen aus dem DOM; ohne unobserve würde der Observer sie samt
+     * Inhalt dauerhaft halten (wachsender Speicher in langen Sitzungen).
+     */
+    function releaseDetachedTweets(nodes) {
+        if (!prefetchObserver) return;
+        for (var i = 0; i < nodes.length; i++) {
+            var node = nodes[i];
+            if (node.matches && node.matches(CONFIG.tweetSelector)) prefetchObserver.unobserve(node);
+            if (node.querySelectorAll) {
+                var nested = node.querySelectorAll(CONFIG.tweetSelector);
+                for (var j = 0; j < nested.length; j++) prefetchObserver.unobserve(nested[j]);
+            }
+        }
+    }
+
     // Maximale Anzahl Medien-Rechecks pro Tweet (Lazy-Loading-Abdeckung)
     var MAX_TWEET_RECHECKS = 3;
+
+    /**
+     * Plant einen erneuten Verarbeitungslauf (max. MAX_TWEET_RECHECKS), wenn
+     * Medien oder die Aktionsleiste erst später gerendert werden. Der Zähler im
+     * data-Attribut verhindert Endlosschleifen und doppelte Buttons.
+     */
+    function scheduleTweetRecheck(tweet) {
+        var rechecks = parseInt(tweet.dataset.xloaderRechecked || '0', 10);
+        if (rechecks >= MAX_TWEET_RECHECKS) return;
+        tweet.dataset.xloaderRechecked = String(rechecks + 1);
+        setTimeout(function () {
+            if (tweet.isConnected && !tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) {
+                processTweet(tweet);
+            }
+        }, CONFIG.recheckDelayMs);
+    }
 
     function processTweet(tweet) {
         if (!tweet || !tweet.isConnected) return;
@@ -1451,21 +1609,18 @@
 
         if (hasMediaIndicator(tweet)) {
             var btn = createButton(tweet);
-            if (btn) log.info('Download-Button eingefügt für Tweet ' + getTweetId(tweet));
+            if (btn) {
+                log.info('Download-Button eingefügt für Tweet ' + getTweetId(tweet));
+            } else {
+                // div[role="group"] (Aktionsleiste) ist evtl. noch nicht gerendert
+                scheduleTweetRecheck(tweet);
+            }
             // Medien-URLs im Hintergrund vorladen, sobald der Tweet sichtbar ist
             observeForPrefetch(tweet);
         } else {
             // Medien können nachgeladen werden (z. B. Lazy-Loading) — Recheck
             // bis zu MAX_TWEET_RECHECKS Mal, dann aufgeben.
-            var rechecks = parseInt(tweet.dataset.xloaderRechecked || '0', 10);
-            if (rechecks < MAX_TWEET_RECHECKS) {
-                tweet.dataset.xloaderRechecked = String(rechecks + 1);
-                setTimeout(function () {
-                    if (tweet.isConnected && !tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) {
-                        processTweet(tweet);
-                    }
-                }, CONFIG.recheckDelayMs);
-            }
+            scheduleTweetRecheck(tweet);
         }
     }
 
@@ -1492,7 +1647,13 @@
             for (var j = 0; j < batch.length; j++) {
                 var node = batch[j];
                 if (node.nodeType !== Node.ELEMENT_NODE) continue;
-                if (node.matches && node.matches(CONFIG.tweetSelector)) tweets.add(node);
+                // Liegt der eingefügte Knoten bereits in einem Tweet, reicht
+                // dieser Tweet — erspart querySelectorAll über den Teilbaum.
+                var host = node.closest ? node.closest(CONFIG.tweetSelector) : null;
+                if (host) {
+                    tweets.add(host);
+                    continue;
+                }
                 var nested = node.querySelectorAll ? node.querySelectorAll(CONFIG.tweetSelector) : [];
                 for (var k = 0; k < nested.length; k++) tweets.add(nested[k]);
             }
@@ -1510,17 +1671,23 @@
 
         var observer = new MutationObserver(function (mutations) {
             var nodes = [];
+            var removed = [];
             for (var i = 0; i < mutations.length; i++) {
                 var added = mutations[i].addedNodes;
                 for (var j = 0; j < added.length; j++) {
                     if (added[j].nodeType === Node.ELEMENT_NODE) nodes.push(added[j]);
                 }
+                var gone = mutations[i].removedNodes;
+                for (var k = 0; k < gone.length; k++) {
+                    if (gone[k].nodeType === Node.ELEMENT_NODE) removed.push(gone[k]);
+                }
             }
             if (nodes.length) scheduleProcess(nodes);
+            if (removed.length) releaseDetachedTweets(removed);
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.23 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.24 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

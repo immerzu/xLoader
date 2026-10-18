@@ -1,13 +1,13 @@
-# xLoader — FACT SHEET (Stand: v1.0.23, 2026-09-06)
+# xLoader — FACT SHEET (Stand: v1.0.24, 2026-10-18, Release)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.23 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.24 dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, 1531 Zeilen, `@version 1.0.23`)
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, 1698 Zeilen, `@version 1.0.24`)
 - **Versionsarchive:** `Ausgabe\xLoader-v1.0.X.js` — Bindestrich-Schema mit echter `@version` (seit 12.08.2026; vorher `xLoader_v1.0.X.js` / `Downloadhilfe_v*.js` im Repo-Root). `Ausgabe/` ist gitignored, Archive bleiben **untracked und werden NIE committet**.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -17,8 +17,9 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Zweck:** Ein Download-Button pro Tweet mit Medien; ein Klick öffnet den nativen „Speichern unter“-Dialog (Bilder, Videos, GIFs). Medien-URLs werden im Hintergrund vorgeladen (sofortiger Dialog).
 - **Git-Stand (05.09.2026):** Arbeitsbaum sauber, HEAD `e71eaae` (v1.0.22-Doku). 11 GitHub-Releases.
 
-## Aktueller Stand (v1.0.23)
+## Aktueller Stand (v1.0.24)
 
+- **v1.0.24** — Release: zehn lokale Download-Korrekturen, 5-min-Stillstands-Watchdog, klarere `GM_download`-Fehler (`not_enabled`/`not_permitted`/`not_whitelisted`/`not_succeeded`). Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome + Yandex (Browser-API).
 - **v1.0.23** — Kurzbeschreibung lokalisiert: `@description` = deutsche Default-Zeile (= GF-Skript-Locale `de`) + `@description:en` + `@description:ru`. Grund: Die GF-Suche filtert standardmäßig nach Sprache (Quellcode-belegt: greasyfork-org/greasyfork `script.rb` `set_locale`/`update_localized_attribute`, `script_indexing.rb:131`, `script_listings.rb` `filter_locale`) — die einzeilige DE/EN/RU-Mischbeschreibung (v1.0.20–22) machte das Skript nur in der **deutschen** Suche auffindbar (Live-Test: EN-Suche fand xLoader nicht). Mit Lokalisierung erscheint es in DE/EN/RU-Suchen. Kein `@description:de` (wird bei Locale `de` ignoriert), keine `@name:xx`-Zeilen. Init-Log + Changelog-Kopf auf v1.0.23.
 - **v1.0.22** — Projekt-Umzug: Repo liegt jetzt unter `F:\001_Coding_Projekte\xLoader` (vorher „Downloadhilfe“); Pfade/Verweise (Skills, Memory, Doku) aktualisiert. README: Platzhalter `{id}` korrigiert (statt `{tweetId}`), „How it works“ + neuer „Development“-Abschnitt (dreisprachig). ru-board-Post auf v1.0.21 aktualisiert.
 - **v1.0.21** — Fix DOM-Fallback: `extractDomMedia` verwarf ALLE Medien des eigenen Tweets — der Guard filterte auf `div[data-testid="tweet"]` (Body-Container) statt auf eingebettete Tweets. Guard prüft jetzt gegen das nächstgelegene `article[data-testid="tweet"]`.
@@ -34,6 +35,16 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 ## Architektur / Code-Struktur (Zeilenangaben v1.0.22)
 
 IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyState` (L1515).
+
+> **Zeilenangaben:** Die Tabelle unten ist Stand v1.0.22 (1520 Zeilen) und in v1.0.23 um ~11
+> Zeilen verschoben. Aktuelle Zeilen (v1.0.23, 1531 Zeilen), Start L1526, vollständiger
+> Funktionskatalog: `HANDOVER_v1.0.23.md` §5.
+> **Release v1.0.24** (1698 Zeilen inkl. v1.0.24-Changelog-Block, `@version 1.0.24`):
+> Die v1.0.23-Zeilenangaben unten verschieben sich durch den neuen Changelog-Block um +15
+> (`failPrefetch` L879, `getHandle` L910, `resolvePosterVideoUrls` L1183, `mergeDomItems`
+> L1247, `loadItemsLive` L1290, `onDownloadClick` L1333, `releaseDetachedTweets` L1517,
+> `scheduleTweetRecheck` L1537, `processTweet` L1548, `init` L1609, Init-Log L1690).
+> Art und Begründung der Änderungen: `HANDOVER_v1.0.23.md` §15/§16.
 
 | Bereich | Funktion | Zeile | Rolle |
 |---|---|---|---|
@@ -87,7 +98,12 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 - **DOM-Fallback-Guard (v1.0.21-Lektion):** Filter gegen `article[data-testid="tweet"]` (nächstgelegenes) — niemals gegen den Body-Container `div[data-testid="tweet"]` prüfen, sonst werden eigene Medien verworfen.
 - **Eingebettete Tweets (v1.0.14-Lektion):** Tweet-ID/Handle vom Medien-Element aus ableiten (Status-Link), nicht vom ersten Zeitstempel.
 - **Token-Retry nicht bei 429** (Rate-Limit) auslösen — verschärft nur das Limit.
+- **Prefetch-Retry nur bei transienten Fehlern** (v1.0.23-Fixfassung 2026-10-18): `failPrefetch(tweetId, reason, status)` verwirft 401/403/429 ohne Retry — ein 10-s-Retry scheitert am selben Token bzw. verschärft das Limit; der Klick lädt live nach. Netzwerk-/Timeout-/Parse-Fehler und leere Antworten werden wie bisher 2× mit 10 s Cooldown wiederholt.
+- **Recheck auch ohne Aktionsleiste** (Fixfassung 2026-10-18): `processTweet` plant über `scheduleTweetRecheck` bis zu 3 Rechecks à 2 s, wenn der Medien-Indikator da ist, `createButton` aber kein `div[role="group"]` findet. Vorher blieb der Button in diesem Fall dauerhaft weg.
+- **Video-Resolver nur gemeinsam** (Fixfassung 2026-10-18): `resolvePosterVideoUrls` löst alle Poster eines Tweets in EINEM Poll-Zyklus mit 5-s-Gesamtdeadline. Nicht wieder pro Poster sequenziell machen (n×5 s Wartezeit; das damalige `clearResourceTimings()` je Poster verwarf bereits geladene Einträge der vorherigen Poster).
+- **`getHandle` über den Medien-Article** (Fixfassung 2026-10-18): maßgeblich ist `article[data-testid="tweet"]`, in dem das Medien-Element liegt — `closest('div[data-testid="User-Name"]')` greift nie, weil dort keine Medien liegen (falscher Handle bei quoted Tweets).
 - **GM_download-Timeout:** ohne `ontimeout`-Pfad deaktiviert ein hängender Download den Button dauerhaft.
+- **Download-Modus/Permission** (Befund 2026-10-18): Im portablen Originalprofil ist `downloads_mode` Default und `downloads` nicht als API-Permission erteilt. Dann hängt `GM_download` ohne Callback (Button bleibt „Lädt Medien …", keine Datei). `off` liefert `not_enabled`. Abhilfe: Modus `native` (oder `downloads` erteilen). Die Fixfassung hat in `downloadUrl` einen 5-min-Stillstands-Watchdog (Fortschritt resettet; SHA-256 `8FA1B0EB…`), der hängende Aufrufe abbricht und `not_enabled`/`not_permitted` mit Handlungshinweis meldet.
 - **Kein Blob-Umweg / kein m3u8→mp4-Umbenennen:** Blob verzögert den Dialog; Playlisten lassen sich nicht einfach umbenennen (kaputte Downloads).
 - **GF-Admin:** zwei Sync-Felder nicht verwechseln (siehe oben); **„Zusätzliche Informationen“ ≠ Changelog-Textarea**.
 - **Manueller GF-Upload (Fallback):** Greasy Forks „Choose File“-Button befüllt die Textarea per Playwright NICHT → FileReader-Trick (eval-basierter Handler) nötig. **Der eval-Trick funktioniert auf greasyfork.org, NICHT auf x.com** (CSP).
@@ -112,14 +128,15 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 - **v1.0.17–v1.0.20** – Beschreibungs-Updates (nur Doku, ohne Git-Tag): zweisprachig → GF-i18n → einzeilig dreisprachig
 - **v1.0.21** – Fix DOM-Fallback (Guard `article[data-testid="tweet"]`)
 - **v1.0.22** – Projekt-Umzug nach `F:\001_Coding_Projekte\xLoader`; README/ru-board-Post aktualisiert
+- **v1.0.24** – Download-Fixes (10 Korrekturen, Watchdog, klarere GM_download-Fehler); Release
 - **v1.0.23** – Kurzbeschreibung lokalisiert (@description DE-Default + :en + :ru) für GF-Suchbarkeit in DE/EN/RU
 
-**Git-Tags:** v1.0.6–v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22 (v1.0.13/v1.0.14 nie veröffentlicht; v1.0.17–v1.0.20 reine Beschreibungs-Updates ohne Tag). Latest Release: GitHub `immerzu/xLoader/releases` + Greasy Fork 589456.
+**Git-Tags:** v1.0.6–v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24 (v1.0.13/v1.0.14 nie veröffentlicht; v1.0.17–v1.0.20 reine Beschreibungs-Updates ohne Tag). Latest Release: GitHub `immerzu/xLoader/releases` + Greasy Fork 589456.
 
 ## Build- & Release-Regeln (verbindlich)
 
-1. **Fix & Version** in `xLoader.user.js`: Metablock `@version` anheben (nie doppelt!); Changelog-Kommentar oben: neuen `v1.0.X:`-Block einfügen (Titel `xLoader v1.0.X (<Kurzname>)` + Bullet-Punkte, DE); Init-Log-Zeile aktualisieren: `log.info('xLoader v1.0.X aktiv — überwache ' + CONFIG.tweetSelector + ' …');` (aktuell L1523). Bei Beschreibungsänderungen die **lokalisierte** `@description` mitpflegen (DE-Default + `:en` + `:ru`, s. o.).
-2. **Tests:** `node --check xLoader.user.js`; falls DOM-relevant zusätzlich `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` (liegt außerhalb dieses Repos, nur lokal).
+1. **Fix & Version** in `xLoader.user.js`: Metablock `@version` anheben (nie doppelt!); Changelog-Kommentar oben: neuen `v1.0.X:`-Block einfügen (Titel `xLoader v1.0.X (<Kurzname>)` + Bullet-Punkte, DE); Init-Log-Zeile aktualisieren: `log.info('xLoader v1.0.X aktiv — überwache ' + CONFIG.tweetSelector + ' …');` (aktuell L1690). Bei Beschreibungsänderungen die **lokalisierte** `@description` mitpflegen (DE-Default + `:en` + `:ru`, s. o.).
+2. **Tests:** `node --check xLoader.user.js`; falls DOM-relevant zusätzlich `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` (liegt außerhalb dieses Repos, nur lokal) und `node /c/Users/lolo/dh-test/xloader/fixes-test.js xLoader.user.js` (gezielte Fix-/Regressionstests der Fixfassung 2026-10-18; gegen v1.0.23 aus HEAD rot, gegen die Fixfassung grün).
 3. **Archivkopie:** `cp xLoader.user.js Ausgabe/xLoader-v1.0.X.js` — bleibt **untracked**, wird NIE committet.
 4. **Commit + Push** (Git Bash ok): `git add xLoader.user.js && git commit -m "v1.0.X: <Kurzbeschreibung>"` → `git push origin main` → **Webhook feuert → Greasy Fork aktualisiert automatisch**.
 5. **GF-Verifikation:** `web_fetch https://greasyfork.org/de/scripts/589456-xloader/versions` — neue Version + Datum bestätigen. Zieht GF nicht (zeitnah): GF-Admin → „Jetzt aktualisieren und synchronisieren“ (Button `input[name="update-and-sync"]`).
@@ -140,3 +157,4 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 | `F:\001_Coding_Projekte\xLoader\memory\` | Projektgedächtnis (dieses Verzeichnis) |
 | `F:\001_Coding_Projekte\xLoader\.reasonix\skills\greasy-fork-release\SKILL.md` | lokales Release-Playbook (Spiegel in `!Wichtiges\Meine _Skills\projekt_weit\xLoader\`) |
 | `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` | optionaler DOM-Regressionstest (außerhalb Repo, lokal) |
+
