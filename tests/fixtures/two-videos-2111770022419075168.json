@@ -1,0 +1,78 @@
+{
+  "id_str": "2111770022419075168",
+  "extended_entities": {
+    "media": [
+      {
+        "id_str": "2111769754813804544",
+        "type": "video",
+        "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2111769754813804544/img/Mc3Ix-GLYoSjwrgM.jpg",
+        "video_info": {
+          "aspect_ratio": [
+            9,
+            16
+          ],
+          "duration_millis": 15557,
+          "variants": [
+            {
+              "bitrate": 632000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/vid/avc1/320x568/Vc3s8Du-bAcgtOf2.mp4?tag=29"
+            },
+            {
+              "bitrate": 950000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/vid/avc1/480x852/m-52WFUzWvjl-cbP.mp4?tag=29"
+            },
+            {
+              "bitrate": 25128000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/vid/avc1/2160x3840/pEy2TBj7yBBRgy7a.mp4?tag=29"
+            },
+            {
+              "content_type": "application/x-mpegURL",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/pl/zFCXbKL8kNY0YtIz.m3u8?tag=29&v=cfc"
+            },
+            {
+              "bitrate": 2176000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/vid/avc1/720x1280/3eYMJPVUgsXYXlPS.mp4?tag=29"
+            },
+            {
+              "bitrate": 10368000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754813804544/vid/avc1/1080x1920/UuFmp9y4RCRmNUs2.mp4?tag=29"
+            }
+          ]
+        }
+      },
+      {
+        "id_str": "2111769754809614337",
+        "type": "video",
+        "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2111769754809614337/img/y_NN2evJauiA83fc.jpg",
+        "video_info": {
+          "aspect_ratio": [
+            40,
+            71
+          ],
+          "duration_millis": 6919,
+          "variants": [
+            {
+              "content_type": "application/x-mpegURL",
+              "url": "https://video.twimg.com/amplify_video/2111769754809614337/pl/wy6mICuwJeId6Rpr.m3u8?tag=29"
+            },
+            {
+              "bitrate": 950000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754809614337/vid/avc1/480x852/gmD4twvboyLQCkL4.mp4?tag=29"
+            },
+            {
+              "bitrate": 632000,
+              "content_type": "video/mp4",
+              "url": "https://video.twimg.com/amplify_video/2111769754809614337/vid/avc1/320x568/O5b0Ux7j0Dak9zKf.mp4?tag=29"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

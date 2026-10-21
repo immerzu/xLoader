@@ -35,7 +35,7 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 **English 🇬🇧**
 - **Images, videos and GIFs** — one button per tweet; the **"Save as" dialog appears for the first medium** by default (configurable: all media via the Tampermonkey menu).
-- **Instant dialog:** media URLs are prefetched for visible tweets (IntersectionObserver), so the save dialog appears immediately after the click.
+- **Choose first, download afterwards:** supported Chromium browsers open the first file picker before streaming the media to disk. Prefetch reduces metadata lookup time. Without File System Access or an active user gesture, the existing `GM_download` path is used. Subsequent media retain the first/all save modes.
 - **Reliable URL extraction:** X.com renders videos/GIFs only as posters — xLoader combines the X API (`conversation.json`, live-token retry on auth errors) with the visible DOM media (posters, article-card images `card_img`) and resolves real MP4 URLs via the playback performance buffer.
 - **Filenames:** default `@{handle}_{id}_{index}.{ext}` (e.g. `@elonmusk_123456789_1.mp4`) — configurable via the Tampermonkey menu: placeholders `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Layout:** the button is cloned from an existing X.com action-bar button, so it adapts perfectly (desktop and mobile).
@@ -44,7 +44,7 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 **Deutsch 🇩🇪**
 - **Bilder, Videos und GIFs** — ein Button pro Tweet; der **„Speichern unter“-Dialog erscheint standardmäßig nur für das erste Medium** (umschaltbar über das Tampermonkey-Menü).
-- **Sofortiger Dialog:** Medien-URLs werden für sichtbare Tweets vorgeladen (IntersectionObserver) — der Dialog erscheint unmittelbar nach dem Klick.
+- **Erst auswählen, dann herunterladen:** unterstützte Chromium-Browser öffnen die erste Dateiauswahl vor dem Streaming auf die Festplatte. Prefetch verkürzt die Metadatensuche. Ohne File System Access oder aktive Benutzeraktion greift der bisherige `GM_download`-Pfad. Weitere Medien behalten die Speicheroptionen first/all.
 - **Zuverlässige URL-Extraktion:** X.com rendert Videos/GIFs nur als Poster — xLoader kombiniert die X-API (`conversation.json`, Live-Token-Retry bei Auth-Fehlern) mit den sichtbaren DOM-Medien (Poster, Artikel-Card-Bilder `card_img`) und löst echte MP4-URLs über den Wiedergabe-Performance-Buffer auf.
 - **Dateinamen:** Standard `@{handle}_{id}_{index}.{ext}` (z. B. `@elonmusk_123456789_1.mp4`) — konfigurierbar über das Tampermonkey-Menü: Platzhalter `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Layout:** Der Button wird aus einem vorhandenen X.com-Aktionsleisten-Button geklont und passt sich damit exakt an (Desktop und mobil).
@@ -53,7 +53,7 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 **Русский 🇷🇺**
 - **Изображения, видео и GIF** — одна кнопка на твит; по умолчанию диалог «Сохранить как» открывается для первого медиа (настраивается: все медиа через меню Tampermonkey).
-- **Мгновенный диалог:** URL медиа предзагружаются для видимых твитов (IntersectionObserver) — диалог появляется сразу после клика.
+- **Сначала выбор файла, затем загрузка:** поддерживаемые Chromium-браузеры открывают первый диалог до потоковой записи на диск. Предзагрузка ускоряет поиск URL. Без File System Access или активного действия пользователя используется прежний путь `GM_download`. Для остальных медиа сохраняются режимы first/all.
 - **Надёжное извлечение URL:** X.com показывает видео/GIF только как постеры — xLoader объединяет X API (`conversation.json`, повторный запрос live-токена при ошибках авторизации) с видимыми DOM-медиа (постеры, изображения карточек статей `card_img`) и определяет реальные MP4-URL через performance buffer воспроизведения.
 - **Имена файлов:** по умолчанию `@{handle}_{id}_{index}.{ext}` (например `@elonmusk_123456789_1.mp4`) — настраивается через меню Tampermonkey: плейсхолдеры `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Макет:** кнопка клонируется из существующей кнопки панели действий X.com и идеально подстраивается (десктоп и мобильные).
@@ -70,7 +70,11 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.24** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.26** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+
+- **v1.0.26** — save dialog before media transfer; correct streaming startup, timeout handling and completion prevent empty first video files. The user confirmed the fast dialog and both saved videos on Windows.
+
+- **v1.0.25 (local only / nur lokal / только локально)** — first file picker before DOM/video merge and media transfer; streaming write with progress, stall watchdog and error cleanup. Existing filenames, multi-media options and `GM_download` fallback remain. The user confirmed the faster dialog in their browser; no automated native dialog timing is claimed.
 
 - **v1.0.24** — download fixes: quoted-tweet handle, recheck without action bar, local API status, shared video resolver, single DOM merge; robust error handling and a 5-minute stall watchdog; clearer `GM_download` errors. Tested: 13/13 fix, 11/11 DOM, 19/19 watchdog tests; portable Chrome and Yandex (Browser API).
 
@@ -91,7 +95,11 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.24** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste Version: **v1.0.26** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.26** — Dateiauswahl vor dem Datentransfer; korrigierter Streamstart, Timeout und Abschluss verhindern leere erste Videodateien. Der Nutzer bestätigt unter Windows den schnellen Dialog und beide gespeicherten Videos.
+
+- **v1.0.25** — erste Dateiauswahl vor DOM-/Video-Merge und Datentransfer; Streaming mit Fortschritt, Stillstands-Watchdog und Fehlerbereinigung. Dateinamen, Mehrfachmedienoptionen und `GM_download`-Fallback bleiben erhalten. Der Nutzer hat den schnellen Dialog im Browser bestätigt; keine automatisch gemessenen nativen Dialogzeiten.
 
 - **v1.0.24** — Download-Fixes: quoted-Tweet-Handle, Recheck ohne Aktionsleiste, lokaler API-Status, gemeinsamer Video-Resolver, einmaliger DOM-Merge; robuste Fehlerbehandlung und 5-Minuten-Stillstands-Watchdog; klarere `GM_download`-Fehler. Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome und Yandex (Browser-API).
 
@@ -112,7 +120,11 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.24** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.26** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+
+- **v1.0.26** — выбор файла до передачи данных; исправлены запуск потока, таймаут и завершение загрузки первого видео. Пользователь подтвердил быстрый диалог и сохранение обоих видео в Windows.
+
+- **v1.0.25** — первый выбор файла до DOM/video-merge и передачи данных; потоковая запись с прогрессом, watchdog и обработкой ошибок. Сохранены имена файлов, режимы нескольких медиа и запасной `GM_download`. Пользователь подтвердил быстрый диалог в браузере; автоматический замер нативного диалога не проводился.
 
 - **v1.0.24** — исправления загрузки: handle для quoted-твитов, повторная проверка без панели действий, локальный статус API, общий видео-резолвер, однократный DOM-merge; надёжная обработка ошибок и 5-минутный watchdog; понятные ошибки `GM_download`. Проверено: 13/13 fix, 11/11 DOM, 19/19 watchdog; портативный Chrome и Yandex (Browser API).
 
@@ -133,15 +145,19 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22 (v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## Development / Entwicklung / Разработка
 
-**English 🇬🇧:** The repository contains a single source file — `xLoader.user.js` (userscript; the metadata block and the full changelog are at the top). The `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` files are local version archives from older releases (underscore naming, repo root); new archives go to `Ausgabe/xLoader-v1.0.X.js` (hyphen + current `@version`). They are intentionally never committed (`Ausgabe/` is gitignored). `description.md` is the source for the Greasy Fork "Additional info" section (DE → RU → EN). Syntax check: `node --check xLoader.user.js`. Optional DOM regression test (lives outside this repo, local only): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release flow: bump `@version` + changelog comment + init log line in the script → `node --check` → commit & push to `main` → Greasy Fork updates automatically via webhook → optional GitHub tag + release (`gh release create`).
+**English 🇬🇧:** The repository contains a single source file — `xLoader.user.js` (userscript; the metadata block and the full changelog are at the top). The `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` files are local version archives from older releases (underscore naming, repo root); new archives go to `Ausgabe/xLoader-v1.0.X.js` (since v1.0.24: `xLoader-v1.0.X.user.js`; hyphen + current `@version`). They are intentionally never committed (`Ausgabe/` is gitignored). `description.md` is the source for the Greasy Fork "Additional info" section (DE → RU → EN). Syntax check: `node --check xLoader.user.js`. Optional DOM regression test (lives outside this repo, local only): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release flow: bump `@version` + changelog comment + init log line in the script → `node --check` → commit & push to `main` → Greasy Fork updates automatically via webhook → optional GitHub tag + release (`gh release create`).
 
-**Deutsch 🇩🇪:** Das Repository enthält genau eine Quelldatei — `xLoader.user.js` (Userscript; Metablock und vollständiger Changelog stehen oben). Die Dateien `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` sind lokale Versionsarchive aus früheren Releases (Unterstrich-Benennung, Repo-Root); neue Archive kommen nach `Ausgabe/xLoader-v1.0.X.js` (Bindestrich + aktuelle `@version`). Sie werden bewusst nie committet (`Ausgabe/` ist gitignored). `description.md` ist die Quelle für den Abschnitt „Zusätzliche Informationen“ auf Greasy Fork (DE → RU → EN). Syntax-Check: `node --check xLoader.user.js`. Optionaler DOM-Regressionstest (außerhalb dieses Repos, nur lokal): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release-Ablauf: `@version` + Changelog-Kommentar + Init-Log-Zeile im Skript anheben → `node --check` → Commit & Push auf `main` → Greasy Fork aktualisiert per Webhook automatisch → optional GitHub-Tag + Release (`gh release create`).
+**Deutsch 🇩🇪:** Das Repository enthält genau eine Quelldatei — `xLoader.user.js` (Userscript; Metablock und vollständiger Changelog stehen oben). Die Dateien `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` sind lokale Versionsarchive aus früheren Releases (Unterstrich-Benennung, Repo-Root); neue Archive kommen nach `Ausgabe/xLoader-v1.0.X.js` (seit v1.0.24: `xLoader-v1.0.X.user.js`; Bindestrich + aktuelle `@version`). Sie werden bewusst nie committet (`Ausgabe/` ist gitignored). `description.md` ist die Quelle für den Abschnitt „Zusätzliche Informationen“ auf Greasy Fork (DE → RU → EN). Syntax-Check: `node --check xLoader.user.js`. Optionaler DOM-Regressionstest (außerhalb dieses Repos, nur lokal): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release-Ablauf: `@version` + Changelog-Kommentar + Init-Log-Zeile im Skript anheben → `node --check` → Commit & Push auf `main` → Greasy Fork aktualisiert per Webhook automatisch → optional GitHub-Tag + Release (`gh release create`).
 
-**Русский 🇷🇺:** В репозитории один исходный файл — `xLoader.user.js` (юзерскрипт; метаблок и полный журнал изменений в начале). Файлы `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` — локальные архивы версий из более ранних релизов (именование с подчёркиванием, корень репозитория); новые архивы сохраняются в `Ausgabe/xLoader-v1.0.X.js` (дефис + актуальная `@version`). Они намеренно никогда не коммитятся (`Ausgabe/` в .gitignore). `description.md` — источник раздела «Дополнительная информация» на Greasy Fork (DE → RU → EN). Проверка синтаксиса: `node --check xLoader.user.js`. Необязательный DOM-регресс-тест (вне этого репозитория, только локально): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Порядок релиза: поднять `@version` + комментарий журнала + строку лога инициализации в скрипте → `node --check` → commit и push в `main` → Greasy Fork обновляется автоматически через webhook → опционально тег GitHub + релиз (`gh release create`).
+**Русский 🇷🇺:** В репозитории один исходный файл — `xLoader.user.js` (юзерскрипт; метаблок и полный журнал изменений в начале). Файлы `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` — локальные архивы версий из более ранних релизов (именование с подчёркиванием, корень репозитория); новые архивы сохраняются в `Ausgabe/xLoader-v1.0.X.js` (с v1.0.24: `xLoader-v1.0.X.user.js`; дефис + актуальная `@version`). Они намеренно никогда не коммитятся (`Ausgabe/` в .gitignore). `description.md` — источник раздела «Дополнительная информация» на Greasy Fork (DE → RU → EN). Проверка синтаксиса: `node --check xLoader.user.js`. Необязательный DOM-регресс-тест (вне этого репозитория, только локально): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Порядок релиза: поднять `@version` + комментарий журнала + строку лога инициализации в скрипте → `node --check` → commit и push в `main` → Greasy Fork обновляется автоматически через webhook → опционально тег GitHub + релиз (`gh release create`).
+
+## Release checks / Release-Prüfung
+
+Run `node --check xLoader.user.js`, `node tests/dom-media.test.cjs`, `node tests/fixes.test.cjs`, `node tests/watchdog.test.cjs` and `node --test tests/download-flow.test.cjs`. The 43 regression checks plus 28 download tests cover completion, byte integrity, cancellation, errors, first/all and the fallback without touching browser profiles. The HTTP/disk test uses a local server; picker and Tampermonkey callbacks are test doubles. Both videos of the reported two-video tweet were additionally transferred using real Tampermonkey 5.5.1, with matching byte counts and independently checked SHA-256 values (file adapter). Stream startup accepts status 0, avoids the immediate fetch timeout, and requests the completion signal. Browser APIs and sandbox support vary; native dialog behavior is user-confirmed, not timed by these tests.
 
 ## License / Lizenz / Лицензия
 

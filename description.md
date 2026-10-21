@@ -1,5 +1,5 @@
-Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar.
+Lädt Bilder, Videos und GIFs auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich für das erste Medium die Dateiauswahl vor dem Streaming-Download. Medien-URLs werden vorgeladen; GM_download bleibt als Fallback erhalten. Speicheroptionen und Dateinamen sind konfigurierbar.
 
-Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
+Скачивает изображения, видео и GIF с X.com/Twitter. В поддерживаемых браузерах выбор первого файла открывается до потоковой загрузки. URL медиа предзагружаются; сохранён запасной путь GM_download. Режим сохранения и имена файлов настраиваются.
 
-Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu.
+Downloads images, videos and GIFs on X.com/Twitter. Supported browsers open the first file picker before the streaming download. Media URLs are prefetched; GM_download remains available as a fallback. Save options and filenames are configurable.

@@ -1,24 +1,28 @@
-# xLoader — FACT SHEET (Stand: v1.0.24, 2026-10-18, Release)
+# xLoader — FACT SHEET (Stand: v1.0.26, 2026-10-21, Release-Freigabe)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.24 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.26 dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, 1698 Zeilen, `@version 1.0.24`)
-- **Versionsarchive:** `Ausgabe\xLoader-v1.0.X.js` — Bindestrich-Schema mit echter `@version` (seit 12.08.2026; vorher `xLoader_v1.0.X.js` / `Downloadhilfe_v*.js` im Repo-Root). `Ausgabe/` ist gitignored, Archive bleiben **untracked und werden NIE committet**.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.26`). Dialogoptimierung aus der Nutzer-Testfassung, anschließend ausdrücklich beauftragter Streamingfix: Status 0 zulassen, keinen Fetch-timeout:0, onloadend anfordern, HTTP-Abschluss vor Dateiübernahme prüfen.
+- **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
 - **Webhook (Hauptweg seit 05.08.2026):** GitHub-Hook 661732365 (push-Event) → GF-Skript-Sync „Automatisch“, Sync-URL `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js`. Commit+Push genügt; manueller GF-Upload nur Fallback.
 - **Auto-Update im Skript:** `@updateURL`/`@downloadURL` = raw GitHub `main`.
 - **Install-Link:** `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js` (Tampermonkey bietet Installation an).
-- **Zweck:** Ein Download-Button pro Tweet mit Medien; ein Klick öffnet den nativen „Speichern unter“-Dialog (Bilder, Videos, GIFs). Medien-URLs werden im Hintergrund vorgeladen (sofortiger Dialog).
-- **Git-Stand (05.09.2026):** Arbeitsbaum sauber, HEAD `e71eaae` (v1.0.22-Doku). 11 GitHub-Releases.
+- **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
+- **Veröffentlichter Ausgangsstand:** v1.0.24, Commit `e16a6cf`. Die korrigierte v1.0.26 ist nach erfolgreichem Windows-Nutzertest zur Veröffentlichung freigegeben; aktueller Einstieg `HANDOVER_v1.0.26.md`. v1.0.25 wird nicht nachträglich veröffentlicht.
 
-## Aktueller Stand (v1.0.24)
+## Aktueller Stand (v1.0.26)
 
+- **v1.0.26, 2026-10-21:** Auf Nutzeranweisung jedes neue Build mit höherer Patchversion ausgeben. Metablock, Changelog, Init-Log und README angepasst, Downloadlogik unverändert. Lokales Build Ausgabe/xLoader-v1.0.26.user.js, SHA-256 E673B1F25F022598A6F114EB46001D953DB6C7956D431E5795F4BC0FF95FD808. Alte Archive erhalten. Nutzer bestätigt schnelle native Windows-Dateiauswahl und beide gespeicherten Videos; Veröffentlichung der unveränderten Bytes ausdrücklich freigegeben. Regel für neue Builds verbindlich in AGENTS.md; bestehende freigegebene Version bei reiner Veröffentlichung nicht erneut erhöhen.
+
+- **v1.0.25, 2026-10-21:** Nutzer bestätigt die getestete Dialogoptimierung und den schnellen Speichern-Dialog im eigenen Browser; Veröffentlichung ausdrücklich freigegeben. Grundlage vor dem anschließend vom Nutzer beauftragten Streamingfix: `Ausgabe/xLoader-v1.0.24-dialog-test-20261021.user.js` (SHA-256 `58847020F66CECABABCD4780E745BE2DB17D9F6A20AF286C6F05890317D73F6B`). Erste Dateiauswahl vor DOM-/Video-Merge; Streaming mit Fortschritt und Fehlerbereinigung. Weitere Medien und Browser ohne Picker behalten GM_download. Keine automatisch ermittelte native Millisekundenmessung; kein allgemeiner Nachweis für alle Browser. Streamingfix mit echtem Tampermonkey 5.5.1 an beiden gemeldeten Videos geprüft: 42.683.448 und 558.184 Bytes, SHA-256 unabhängig identisch; Datei-Adapter statt nativer Speicherdialog. 43 Regressionstests und 28 Downloadtests bestanden. Tests und Release-Hash im Handover.
+- **Browser 2026-10-21:** Dauerhaftes Playwright-Nutzerprofil mit regulär installiertem Tampermonkey 5.5.1. Tampermonkey **nicht per `--load-extension` starten**: wiederholtes Installationsereignis sperrte alle vorhandenen Skripte wegen unbekannter Herkunft (Code 12), trotz grünem Schalter. Nach Reparatur blieben die fünf zuvor aktiven Skripte nach Neustarts aktiv (Code 0), xLoader 1.0.24 zeigte auf echtem X.com wieder den Downloadbutton. **Verbindliche Details:** [BROWSER_STARTUP_2026-10-21.md](BROWSER_STARTUP_2026-10-21.md), vor Browserarbeiten lesen; ältere Startflag-Empfehlungen sind überholt. Die Browserreparatur ist unabhängig vom Release; bei Releasearbeiten keine Browserprofile oder Einstellungen verändern.
 - **v1.0.24** — Release: zehn lokale Download-Korrekturen, 5-min-Stillstands-Watchdog, klarere `GM_download`-Fehler (`not_enabled`/`not_permitted`/`not_whitelisted`/`not_succeeded`). Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome + Yandex (Browser-API).
 - **v1.0.23** — Kurzbeschreibung lokalisiert: `@description` = deutsche Default-Zeile (= GF-Skript-Locale `de`) + `@description:en` + `@description:ru`. Grund: Die GF-Suche filtert standardmäßig nach Sprache (Quellcode-belegt: greasyfork-org/greasyfork `script.rb` `set_locale`/`update_localized_attribute`, `script_indexing.rb:131`, `script_listings.rb` `filter_locale`) — die einzeilige DE/EN/RU-Mischbeschreibung (v1.0.20–22) machte das Skript nur in der **deutschen** Suche auffindbar (Live-Test: EN-Suche fand xLoader nicht). Mit Lokalisierung erscheint es in DE/EN/RU-Suchen. Kein `@description:de` (wird bei Locale `de` ignoriert), keine `@name:xx`-Zeilen. Init-Log + Changelog-Kopf auf v1.0.23.
 - **v1.0.22** — Projekt-Umzug: Repo liegt jetzt unter `F:\001_Coding_Projekte\xLoader` (vorher „Downloadhilfe“); Pfade/Verweise (Skills, Memory, Doku) aktualisiert. README: Platzhalter `{id}` korrigiert (statt `{tweetId}`), „How it works“ + neuer „Development“-Abschnitt (dreisprachig). ru-board-Post auf v1.0.21 aktualisiert.
@@ -81,7 +85,7 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 1. **Injektion:** Initial-Scan + MutationObserver; `processTweet` fügt pro Tweet mit Medien-Indikator einen geklonten Button ein; Lazy-Loading wird bis 3× nachgeprüft.
 2. **Prefetch:** erst wenn der Tweet sichtbar wird (IntersectionObserver) → API-Call im Hintergrund (max. 3 parallel, Queue max. 30) → Cache `Map<tweetId,{items,fetchedAt}>`, TTL 5 min. Prefetch-Fehler (401/429/Timeout/leer): max. 2 automatische Retries mit 10-s-Cooldown, still verworfen.
 3. **Klick (Cache-Miss-Fallback-Kette):** X-API (`conversation.json`) → **Live-Token-Retry** (nur bei 401/403/Netzwerkfehler, **NICHT bei 429**) → **DOM-Merge** (`mergeDomItems`: Poster/Standbilder, `card_img`; Video-MP4 via `resolvePosterVideoUrl`) → differenzierte Fehlermeldung (429 / 401+403 / sonst). Cache-Treffer: sofortiger Download ohne API-Call.
-4. **Download:** direkter `GM_download(url, …, saveAs: true)` — Dialog erscheint unmittelbar. Modus „first“: nur das erste Medium bekommt den Dialog, weitere gehen direkt in den Download-Ordner. Button beim Klick sofort deaktiviert (Doppelklick-Guard). Fortschritts-Badge nur bei Videos ≥ 5 MB, Prozent aus `done`/`total`. Nach Download Cache-Eintrag invalidieren.
+4. **Download (v1.0.25):** Bei verfügbaren APIs und aktiver Benutzeraktion erste Dateiauswahl vor dem DOM-Merge; danach GM_xmlhttpRequest-Stream in die gewählte Datei (Fortschritt und Stillstands-Watchdog). Weitere Medien laufen weiterhin über GM_download mit dem first/all-Modus. Ohne Picker/Benutzeraktivierung GM_download auch für das erste Medium. Abbruch der Dateiauswahl beendet die Serie; Fehler geben den Button frei.
 5. **Token:** Guest-Bearer (fest im Code, aus x.com main.js) + dynamischer Live-Bearer-Token (Regex `A{20,}…`, TTL 1 h, localStorage `xloader-live-token`, Migration alter Key beim ersten Lesen). Header `x-guest-token` immer senden, wenn Guest-Token existiert.
 
 ## Medien-Domains & Typen
@@ -136,7 +140,9 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 ## Build- & Release-Regeln (verbindlich)
 
 1. **Fix & Version** in `xLoader.user.js`: Metablock `@version` anheben (nie doppelt!); Changelog-Kommentar oben: neuen `v1.0.X:`-Block einfügen (Titel `xLoader v1.0.X (<Kurzname>)` + Bullet-Punkte, DE); Init-Log-Zeile aktualisieren: `log.info('xLoader v1.0.X aktiv — überwache ' + CONFIG.tweetSelector + ' …');` (aktuell L1690). Bei Beschreibungsänderungen die **lokalisierte** `@description` mitpflegen (DE-Default + `:en` + `:ru`, s. o.).
-2. **Tests:** `node --check xLoader.user.js`; falls DOM-relevant zusätzlich `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` (liegt außerhalb dieses Repos, nur lokal) und `node /c/Users/lolo/dh-test/xloader/fixes-test.js xLoader.user.js` (gezielte Fix-/Regressionstests der Fixfassung 2026-10-18; gegen v1.0.23 aus HEAD rot, gegen die Fixfassung grün).
+2. **Tests (reproduzierbar im Repository):** `node --check xLoader.user.js`; `node tests/dom-media.test.cjs`; `node tests/fixes.test.cjs`; `node tests/watchdog.test.cjs`; `node --test tests/download-flow.test.cjs`. Fix-Klick-Harness mit Picker-Stub, Picker-/Streamingpfade separat geprüft.
+
+   **Historische externe Testpfade:** `node --check xLoader.user.js`; falls DOM-relevant zusätzlich `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` (liegt außerhalb dieses Repos, nur lokal) und `node /c/Users/lolo/dh-test/xloader/fixes-test.js xLoader.user.js` (gezielte Fix-/Regressionstests der Fixfassung 2026-10-18; gegen v1.0.23 aus HEAD rot, gegen die Fixfassung grün).
 3. **Archivkopie:** `cp xLoader.user.js Ausgabe/xLoader-v1.0.X.js` — bleibt **untracked**, wird NIE committet.
 4. **Commit + Push** (Git Bash ok): `git add xLoader.user.js && git commit -m "v1.0.X: <Kurzbeschreibung>"` → `git push origin main` → **Webhook feuert → Greasy Fork aktualisiert automatisch**.
 5. **GF-Verifikation:** `web_fetch https://greasyfork.org/de/scripts/589456-xloader/versions` — neue Version + Datum bestätigen. Zieht GF nicht (zeitnah): GF-Admin → „Jetzt aktualisieren und synchronisieren“ (Button `input[name="update-and-sync"]`).
@@ -149,7 +155,7 @@ IIFE `(function(){ 'use strict'; … })()` (L250), Start bei `document.readyStat
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** (v1.0.23, 1531 Zeilen; Metablock + vollständiger Changelog oben) |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.26; Metablock + Changelog oben |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.js` (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |

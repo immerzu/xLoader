@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.24
-// @description  Fügt auf X.com/Twitter unter jedem Tweet einen Download-Button hinzu und lädt dessen Medien (Bilder, Videos, GIFs) über den nativen "Speichern unter"-Dialog herunter. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar nach dem Klick erscheint. Speichern-Dialog-Modus und Cache sind über das Tampermonkey-Menü konfigurierbar.
-// @description:en Adds a download button to every tweet with media on X.com/Twitter and downloads its images, videos and GIFs via the native "Save as" dialog. Media URLs are prefetched in the background so the dialog opens instantly. Save-as mode and cache are configurable via the Tampermonkey menu.
-// @description:ru Добавляет кнопку загрузки под каждый твит с медиа на X.com/Twitter и скачивает его медиафайлы (изображения, видео, GIF) через стандартный диалог «Сохранить как». URL медиа предзагружаются в фоне, поэтому диалог появляется сразу. Режим сохранения и кэш настраиваются через меню Tampermonkey.
+// @version      1.0.26
+// @description  Lädt Bilder, Videos und GIFs auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich für das erste Medium die Dateiauswahl vor dem Streaming-Download. Medien-URLs werden vorgeladen; GM_download bleibt als Fallback erhalten. Speicheroptionen und Dateinamen sind konfigurierbar.
+// @description:en Downloads images, videos and GIFs on X.com/Twitter. Supported browsers open the first file picker before the streaming download. Media URLs are prefetched; GM_download remains available as a fallback. Save options and filenames are configurable.
+// @description:ru Скачивает изображения, видео и GIF с X.com/Twitter. В поддерживаемых браузерах выбор первого файла открывается до потоковой загрузки. URL медиа предзагружаются; сохранён запасной путь GM_download. Режим сохранения и имена файлов настраиваются.
 // @author       xLoader
 // @license      MIT
 // @homepageURL  https://github.com/immerzu/xLoader
@@ -27,6 +27,30 @@
 // ==/UserScript==
 
 /*
+ * xLoader v1.0.26 (Lokales Build, 2026-10-21)
+ * ---------------------------------------------------------------------------
+ * v1.0.26:
+ *  - Neue eindeutige Patchversion fuer das korrigierte lokale Build.
+ *  - Streamingfix der lokalen v1.0.25 uebernommen; Downloadlogik unveraendert.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.25 (Dateiauswahl vor Datentransfer, Release 2026-10-21)
+ * ---------------------------------------------------------------------------
+ * v1.0.25:
+ *  - Erstes bekanntes Medium: nativer Dateidialog vor dem DOM-/Video-Merge;
+ *    anschließend GM_xmlhttpRequest-Stream in die gewählte Datei.
+ *  - Tampermonkey-Window-Proxy: nativer Picker mit document.defaultView als
+ *    Receiver. Ohne Picker/Benutzeraktivierung bleibt GM_download erhalten.
+ *  - Fortschritt, Stillstands-Watchdog, HTTP-/Netzwerkfehler und Dateiabbruch;
+ *    weitere Medien behalten die bestehenden first/all-Speicheroptionen.
+ *  - Vom Nutzer im Browser erfolgreich getestet: schneller Speichern-Dialog.
+ *  - Streaming-Korrektur: Status 0 beim Start zulassen; HTTP-Abschluss vor
+ *    Dateiübernahme prüfen. Kein timeout:0 beim Fetch; Stream-Ende anfordern.
+ *  - Syntaxprüfung, 43 Regressionstests und 28 gezielte Downloadtests; darunter
+ *    realer HTTP-Stream mit Byte-/SHA-256-Vergleich der gespeicherten Datei.
+ *    Native Dialogzeiten wurden nicht automatisiert vermessen.
+ *    Beide Videos des gemeldeten Tweets mit echtem Tampermonkey 5.5.1
+ *    übertragen; Größen und SHA-256 unabhängig verglichen (Datei-Adapter).
+ *
  * xLoader v1.0.24 (Download-Fixes, Watchdog, klarere Fehlermeldungen)
  * ---------------------------------------------------------------------------
  * v1.0.24:
@@ -983,9 +1007,146 @@
     // ============================ Download-Mechanismus ====================
 
     /**
-     * Startet den Download direkt über GM_download mit der URL. saveAs: true
-     * öffnet den nativen "Speichern unter"-Dialog sofort; bei saveAs: false
-     * wird direkt in den Download-Ordner gespeichert (Modus "nur erster").
+     * Dateiauswahl vor dem Datentransfer. Der Picker muss
+     * innerhalb der Benutzeraktivierung aufgerufen werden; deshalb vor dem
+     * asynchronen DOM-/Video-Merge. Ohne API/Benutzeraktivierung bleibt der
+     * bestehende GM_download-Pfad erhalten. Abbrechen startet keinen Download.
+     */
+    async function selectDownloadFile(filename) {
+        if (typeof window.showSaveFilePicker !== 'function' ||
+            (navigator.userActivation && !navigator.userActivation.isActive)) return null;
+        try {
+            // Tampermonkeys window ist ein Proxy. Der native Aufruf benötigt
+            // als Receiver das echte Window aus dem DOM (sonst TypeError:
+            // Illegal invocation). Kein zusätzlicher unsafeWindow-Grant nötig.
+            return await window.showSaveFilePicker.call(document.defaultView, { suggestedName: filename });
+        } catch (err) {
+            if (err.name === 'AbortError') throw err;
+            if (err.name === 'SecurityError' || err.name === 'NotSupportedError' || err.name === 'TypeError') {
+                log.warn('Direkte Dateiauswahl nicht verfügbar; verwende GM_download.');
+                return null;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Erst nach der Dateiauswahl anfordern. GM-Streaming umgeht Seiten-CORS,
+     * hält keine vollständige Mediendatei im RAM und erhält Fortschritt sowie
+     * einen 5-min-Stillstands-Watchdog. createWritable/abort schützt vorhandene
+     * Dateiinhalte bei Übertragungsfehlern; erst close übernimmt das Ergebnis.
+     */
+    async function downloadSelectedFile(url, file, onProgress) {
+        var request = null;
+        var reader = null;
+        var writable = null;
+        var timer = null;
+        var transferError = null;
+        var rejectResponse = null;
+        var rejectComplete = null;
+        var latestResponse = null;
+        var resolveComplete;
+        var complete = new Promise(function (resolve, reject) {
+            resolveComplete = resolve;
+            rejectComplete = reject;
+        });
+        // Fehler können vor dem ersten Stream-Chunk eintreffen.
+        complete.catch(function () {});
+        function fail(err) {
+            if (transferError) return;
+            transferError = err;
+            if (rejectResponse) rejectResponse(err);
+            if (rejectComplete) rejectComplete(err);
+            try { if (request) request.abort(); } catch (e) {}
+            if (reader) reader.cancel().catch(function () {});
+        }
+        function arm() {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(function () {
+                fail(new Error('Download: keine Antwort/Fortschritt (Timeout)'));
+            }, 5 * 60 * 1000);
+        }
+        try {
+            arm();
+            var response = await new Promise(function (resolve, reject) {
+                rejectResponse = reject;
+                request = GM_xmlhttpRequest({
+                    // Bei Tampermonkeys Fetch-Transport kann timeout: 0 sofort
+                    // abbrechen. Ausschließlich der Fortschritts-Watchdog gilt.
+                    method: 'GET', url: url, responseType: 'stream',
+                    onloadstart: function (res) {
+                        // Tampermonkey startet den Fetch-Stream mit Status 0,
+                        // bevor HTTP-Status und Header verfügbar sind.
+                        if (res.status && (res.status < 200 || res.status >= 300)) {
+                            fail(new Error('Download HTTP ' + res.status));
+                        } else if (!res.response || typeof res.response.getReader !== 'function') {
+                            fail(new Error('Tampermonkey liefert keinen Download-Stream'));
+                        } else resolve(res);
+                    },
+                    onreadystatechange: function (res) {
+                        if (res.readyState < 2) return;
+                        latestResponse = res;
+                        if (res.status && (res.status < 200 || res.status >= 300)) {
+                            fail(new Error('Download HTTP ' + res.status));
+                        }
+                    },
+                    onload: function (res) {
+                        latestResponse = res;
+                        if (res.status < 200 || res.status >= 300) {
+                            fail(new Error('Download HTTP ' + res.status));
+                        } else resolveComplete(res);
+                    },
+                    // Tampermonkey fordert damit auch das Stream-Endsignal an.
+                    onloadend: function (res) {
+                        if (res.status < 200 || res.status >= 300) {
+                            fail(new Error('Download HTTP ' + res.status));
+                        }
+                    },
+                    onerror: function () { fail(new Error('Download: Netzwerkfehler')); },
+                    ontimeout: function () { fail(new Error('Download: Timeout')); },
+                    onabort: function () { fail(new Error('Download abgebrochen')); }
+                });
+            });
+            if (transferError) throw transferError;
+            reader = response.response.getReader();
+            writable = await file.createWritable();
+            function contentLength(res) {
+                var length = /(?:^|\r?\n)content-length:\s*(\d+)/i.exec(res.responseHeaders || '');
+                return length ? Number(length[1]) : 0;
+            }
+            var total = contentLength(response);
+            var done = 0;
+            while (true) {
+                var part = await reader.read();
+                if (transferError) throw transferError;
+                if (part.done) break;
+                arm();
+                await writable.write(part.value);
+                done += part.value.byteLength;
+                total = contentLength(latestResponse || response);
+                if (typeof onProgress === 'function') onProgress({ done: done, total: total });
+            }
+            // Stream-Ende allein beweist keinen erfolgreichen HTTP-Abschluss.
+            var finalResponse = await complete;
+            if (transferError) throw transferError;
+            total = contentLength(finalResponse);
+            if (!done || (total && done !== total)) throw new Error('Download unvollständig');
+            await writable.close();
+            writable = null;
+        } catch (err) {
+            fail(err);
+            if (writable) { try { await writable.abort(); } catch (e) {} }
+            throw err;
+        } finally {
+            if (timer) clearTimeout(timer);
+            if (reader) reader.releaseLock();
+        }
+    }
+
+    /**
+     * Bestehender Browser-Download für weitere Medien und Browser ohne Picker.
+     * saveAs fordert einen Dialog an; wann er sichtbar wird, bestimmt der
+     * Browser/Downloadmodus (im Standardmodus ggf. erst nach dem Transfer).
      */
     function downloadUrl(url, filename, saveAs, onProgress) {
         return new Promise(function (resolve, reject) {
@@ -1398,6 +1559,8 @@
         var apiStatus = null;
         var failed = 0;
         var errorMessage = null;
+        var selectedFile = null;
+        var selectedFilename = null;
 
         try {
             var cached = getCachedItems(tweetId);
@@ -1409,6 +1572,15 @@
                 var live = await loadItemsLive(tweetId);
                 items = live.items;
                 apiStatus = live.apiStatus;
+            }
+            // Das erste API-Medium bleibt beim DOM-Merge an erster Stelle.
+            // Daher kann sein Dialog bereits vor einem ggf. 5-s-Video-Resolver
+            // erscheinen. Ohne API-Medien muss erst die Endung geklärt werden.
+            if (items.length) {
+                selectedFilename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
+                    handle: handle, id: tweetId, index: 1, ext: items[0].ext
+                }));
+                selectedFile = await selectDownloadFile(selectedFilename);
             }
             // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
             // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
@@ -1430,12 +1602,13 @@
                         index: i + 1,
                         ext: items[i].ext
                     }));
+                    if (i === 0 && selectedFile) filename = selectedFilename;
                     var saveAs = (saveAsMode === 'all') || (i === 0);
                     // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
                     var isVideo = (items[i].ext === 'mp4');
                     try {
                         log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
-                        await downloadUrl(items[i].url, filename, saveAs, function (progress) {
+                        var reportProgress = function (progress) {
                             // Badge nur bei Videodateien ab einer Mindestgröße — bei
                             // Bildern und kurzen Videos wird nichts angezeigt.
                             if (!progress || !isVideo) return;
@@ -1458,9 +1631,21 @@
                                 showProgress(btn, pct);
                                 btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
                             }
-                        });
+                        };
+                        if (i === 0) {
+                            // Reiner DOM-Fallback: jetzt erst steht die Endung
+                            // fest. Falls die Aktivierung abgelaufen ist, wird
+                            // unverändert GM_download verwendet.
+                            if (!selectedFile && !selectedFilename) selectedFile = await selectDownloadFile(filename);
+                        }
+                        if (i === 0 && selectedFile) {
+                            await downloadSelectedFile(items[i].url, selectedFile, reportProgress);
+                        } else {
+                            await downloadUrl(items[i].url, filename, saveAs, reportProgress);
+                        }
                         log.info('Gespeichert: ' + filename);
                     } catch (err) {
+                        if (err.name === 'AbortError') return;
                         failed++;
                         log.error('Download fehlgeschlagen (' + items[i].url + '): ' + err.message);
                     }
@@ -1478,6 +1663,7 @@
                 }
             }
         } catch (err) {
+            if (err.name === 'AbortError') return;
             errorMessage = 'Fehler beim Laden';
             log.error('Download-Ablauf fehlgeschlagen (Tweet ' + tweetId + '): ' + (err && err.message ? err.message : err));
         } finally {
@@ -1687,7 +1873,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.24 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.26 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {
