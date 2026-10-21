@@ -2,15 +2,15 @@
 
 **English 🇬🇧**
 
-One-click media downloader userscript for X.com/Twitter. Every tweet with media gets a download button; one click opens the native "Save as" dialog with all images, videos and GIFs. Media URLs are prefetched in the background so the dialog appears instantly.
+Media downloader userscript for X.com/Twitter. Recognized tweet media gets a download button. Supported browsers offer an early Save As dialog for the first medium; other media follow the configured save mode. Supported HLS/broadcast recordings, progress display and a cancel confirmation are included.
 
 **Deutsch 🇩🇪**
 
-Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit Medien bekommt einen Download-Button; ein Klick öffnet den nativen „Speichern unter“-Dialog mit allen Bildern, Videos und GIFs. Die Medien-URLs werden im Hintergrund vorgeladen, sodass der Dialog unmittelbar erscheint.
+Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint ein Download-Button. Unterstützte Browser öffnen den ersten Speicherdialog frühzeitig; weitere Medien folgen dem eingestellten Modus. Unterstützte HLS-/Broadcast-Aufzeichnungen, Fortschrittsanzeige und eine Abbruchbestätigung sind enthalten.
 
 **Русский 🇷🇺**
 
-Пользовательский скрипт для скачивания медиа с X.com/Twitter в один клик. Под каждым твитом с медиа появляется кнопка загрузки; один клик открывает стандартный диалог «Сохранить как» со всеми изображениями, видео и GIF. URL медиа предзагружаются в фоне, поэтому диалог появляется мгновенно.
+Скрипт для загрузки медиа с X.com/Twitter. Для распознанных медиа появляется кнопка загрузки. В поддерживаемых браузерах первый диалог сохранения открывается заранее, остальные файлы сохраняются согласно выбранному режиму. Есть поддержка некоторых HLS/трансляций, прогресс и подтверждение отмены.
 
 ---
 
@@ -30,6 +30,12 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 1. Установите [Tampermonkey](https://www.tampermonkey.net/) (Chrome/Edge/Firefox).
 2. Установите скрипт: откройте [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey предложит установку. (Альтернатива: склонируйте репозиторий и импортируйте файл через панель Tampermonkey.)
 3. Откройте [x.com](https://x.com) — под каждым твитом с медиа появится кнопка загрузки в панели действий.
+
+## What's new in v1.0.33 / Neu in v1.0.33 / Новое в v1.0.33
+
+- **EN:** Supports selected X Player-Card, HLS/fMP4 and broadcast recordings; MPEG-TS content may be saved as `.ts`. Click the download button again during transfer to choose Yes (cancel) or No (continue). Not every protected or streaming format is supported.
+- **DE:** Unterstützt bestimmte X-Player-Cards, HLS-/fMP4- und Broadcast-Aufzeichnungen; MPEG-TS wird gegebenenfalls als `.ts` gespeichert. Bei laufendem Download erneut klicken: Ja (abbrechen) oder Nein (fortsetzen). Nicht alle Streaming-/geschützten Formate werden unterstützt.
+- **RU:** Поддерживаются некоторые X Player Card, записи HLS/fMP4 и трансляций; MPEG-TS может сохраняться как `.ts`. Повторное нажатие во время загрузки: Да (отменить) или Нет (продолжить). Поддерживаются не все форматы потокового видео.
 
 ## Features / Funktionen / Возможности
 
@@ -62,11 +68,11 @@ Medien-Downloader-Userscript für X.com/Twitter mit einem Klick. Jeder Tweet mit
 
 ## How it works / Technik / Как это работает
 
-**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Click fallback chain (cache miss): X API → live-token retry → DOM merge (posters, article-card images; video MP4s resolved via the playback performance buffer) → error message. No external dependencies, no server.
+**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Click fallback chain (cache miss): X API → live-token retry → DOM merge (posters, article-card images; video MP4s resolved via the playback performance buffer) → error message. No external dependencies, no server.
 
-**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Fallback-Kette beim Klick (Cache-Miss): X-API → Live-Token-Retry → DOM-Merge (Poster, Artikel-Card-Bilder; Video-MP4s über den Performance-Buffer) → Fehlermeldung. Keine externen Abhängigkeiten, keine Server.
+**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Fallback-Kette beim Klick (Cache-Miss): X-API → Live-Token-Retry → DOM-Merge (Poster, Artikel-Card-Bilder; Video-MP4s über den Performance-Buffer) → Fehlermeldung. Keine externen Abhängigkeiten, keine Server.
 
-**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Цепочка при клике (кэш-промах): X API → повторный запрос live-токена → объединение DOM (постеры, изображения карточек; видео-MP4 через performance buffer) → сообщение об ошибке. Без внешних зависимостей и серверов.
+**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Цепочка при клике (кэш-промах): X API → повторный запрос live-токена → объединение DOM (постеры, изображения карточек; видео-MP4 через performance buffer) → сообщение об ошибке. Без внешних зависимостей и серверов.
 
 ## Version history / Versionshistorie / История версий
 

@@ -1,5 +1,5 @@
-Lädt Bilder, Videos und GIFs auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich für das erste Medium die Dateiauswahl vor dem Streaming-Download. Medien-URLs werden vorgeladen; GM_download bleibt als Fallback erhalten. Speicheroptionen und Dateinamen sind konfigurierbar.
+Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich die erste Dateiauswahl vor dem Streaming. Mit Fortschrittsanzeige und Abbruchbestätigung beim erneuten Klick. GM_download-Fallback und Dateinamenoptionen.
 
-Скачивает изображения, видео и GIF с X.com/Twitter. В поддерживаемых браузерах выбор первого файла открывается до потоковой загрузки. URL медиа предзагружаются; сохранён запасной путь GM_download. Режим сохранения и имена файлов настраиваются.
+Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. В совместимых браузерах первый диалог сохранения открывается до загрузки. Есть прогресс, подтверждение отмены при повторном нажатии, резервный GM_download и настройка имён файлов.
 
-Downloads images, videos and GIFs on X.com/Twitter. Supported browsers open the first file picker before the streaming download. Media URLs are prefetched; GM_download remains available as a fallback. Save options and filenames are configurable.
+Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Supported browsers open the first file picker before streaming. Progress indicator, cancel confirmation on a second click, GM_download fallback and filename options.

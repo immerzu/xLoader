@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.26
-// @description  Lädt Bilder, Videos und GIFs auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich für das erste Medium die Dateiauswahl vor dem Streaming-Download. Medien-URLs werden vorgeladen; GM_download bleibt als Fallback erhalten. Speicheroptionen und Dateinamen sind konfigurierbar.
-// @description:en Downloads images, videos and GIFs on X.com/Twitter. Supported browsers open the first file picker before the streaming download. Media URLs are prefetched; GM_download remains available as a fallback. Save options and filenames are configurable.
-// @description:ru Скачивает изображения, видео и GIF с X.com/Twitter. В поддерживаемых браузерах выбор первого файла открывается до потоковой загрузки. URL медиа предзагружаются; сохранён запасной путь GM_download. Режим сохранения и имена файлов настраиваются.
+// @version      1.0.33
+// @description  Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich die erste Dateiauswahl vor dem Streaming. Mit Fortschrittsanzeige und Abbruchbestätigung beim erneuten Klick. GM_download-Fallback und Dateinamenoptionen.
+// @description:en Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Supported browsers open the first file picker before streaming. Progress indicator, cancel confirmation on a second click, GM_download fallback and filename options.
+// @description:ru Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. В совместимых браузерах первый диалог сохранения открывается до загрузки. Есть прогресс, подтверждение отмены при повторном нажатии, резервный GM_download и настройка имён файлов.
 // @author       xLoader
 // @license      MIT
 // @homepageURL  https://github.com/immerzu/xLoader
@@ -22,11 +22,57 @@
 // @connect      pbs.twimg.com
 // @connect      video.twimg.com
 // @connect      abs.twimg.com
+// @connect      pscp.tv
 // @noframes
 // @run-at       document-end
 // ==/UserScript==
 
 /*
+ * xLoader v1.0.33 (HLS-/Broadcast-Downloads und Abbruchbestätigung)
+ *  - Erneuter Klick auf den laufenden Downloadpfeil zeigt kleine Bestätigung.
+ *  - Nein/Schließen setzt ohne Unterbrechung fort; Ja bricht laufende
+ *    Tampermonkey-, Browser- und HLS-Segmentabrufe tatsächlich ab.
+ *  - Unfertige File-System-Access-Dateien abbrechen, nicht finalisieren;
+ *    blaue Fortschrittsanzeige und gewohnter Downloadpfeil bleiben erhalten.
+ *  - Nutzerbestätigter Browser-Praxistest; zur Veröffentlichung freigegeben.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.32-dev (TEST – HLS-Netzwerkzugriff)
+ *  - Tampermonkey-@connect für alle pscp.tv-Subdomains dokumentationskonform.
+ *  - Bei Fehler im Hintergrund-XHR HLS-Quelle über Browser-Fetch versuchen.
+ *  - Ursächliche HTTP-/Host-/Netzwerk-Fehler ohne vertrauliche URL-Parameter ausgeben.
+ *  - Direkten MP4-Stream und bestehende HLS-Zusammenführung nicht geändert.
+ *  - Noch kein Live-Nachweis am RealAmVoice-Beitrag.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.31-dev (TEST – Broadcast-Replay-Erkennung)
+ *  - X-Broadcast-ID aus Card/DOM aufloesen, Playback-URL abfragen.
+ *  - Wiedergabequellen der Broadcast-Infrastruktur unter *.pscp.tv erkennen.
+ *  - Abgeschlossene, unverschluesselte HLS-MPEG-TS-Aufzeichnungen als .ts
+ *    speichern (nicht falsch als MP4 deklarieren). Bestehende MP4- und
+ *    fMP4-HLS-Pfade beibehalten. Nicht live am Beispiel-Tweet verifiziert.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.30-dev (TEST – HLS/fMP4, nicht veröffentlicht)
+ *  - HLS-Player-Cards und Video-/Audio-Varianten erkennen.
+ *  - Abgeschlossene HLS-Aufnahmen als echte fragmentierte MP4 mit Tonspur
+ *    streamen. Nicht unterstützte/verschlüsselte Streams sicher ablehnen.
+ *  - Geprüfte direkte MP4-Downloads beibehalten.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.29-dev (TEST – nicht veröffentlicht)
+ *  - Player-Card-Felder (unified_card/media_entities und player_stream_url)
+ *    mit Prüfung auf vollständige progressive MP4 auswerten.
+ *  - Doppelte Tweet-Objekte mit vollständigerer Medienliste bevorzugen.
+ *  - Fehler als sichtbare Meldung statt ausschließlich kurzem Tooltip zeigen.
+ *  - Streaming-Dateiauswahl und Downloaddatenpfad unverändert lassen.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.28 (Lokale Testfassung: vollständige progressive MP4)
+ * ---------------------------------------------------------------------------
+ * v1.0.28:
+ *  - HLS-/DASH-Playlisten, Initialisierungssegmente und Fragmente ausschließen.
+ *  - Vorhandene Metadaten des exakt passenden gerenderten Tweets nutzen;
+ *    progressive MP4 mit höchster Bitrate statt Playback-Initsegment wählen.
+ *  - Quellenprüfung auch vor Streaming und GM_download; schneller Picker,
+ *    GIFs, Bilder, Mehrfachmedien und bisheriger Fallback bleiben erhalten.
+ *  - Grundlage unverändert veröffentlichtes v1.0.26, nicht v1.0.27-dev.
+ * ---------------------------------------------------------------------------
  * xLoader v1.0.26 (Lokales Build, 2026-10-21)
  * ---------------------------------------------------------------------------
  * v1.0.26:
@@ -408,8 +454,408 @@
         }
     };
 
+    function downloadAbortError() {
+        var e = new Error('Download vom Benutzer abgebrochen');
+        e.name = 'AbortError';
+        return e;
+    }
+    function ensureNotCancelled(signal) {
+        if (signal && signal.aborted) throw downloadAbortError();
+    }
+    function isCancellation(e, signal) {
+        return (signal && signal.aborted) || (e && e.name === 'AbortError');
+    }
+    function onDownloadAbort(signal, fn) {
+        if (!signal) return function () {};
+        if (signal.aborted) { fn(); return function () {}; }
+        signal.addEventListener('abort', fn, { once: true });
+        return function () { signal.removeEventListener('abort', fn); };
+    }
+
     // ============================ DOM-Medien-Extraktion ====================
     // (nur als Fallback für statische Bilder, wenn die API nicht erreichbar ist)
+
+    // HLS VOD herunterladen: Video- und AAC-Spur als fMP4-Fragmentstrom
+    // in eine echte gemeinsame MP4-Datei zusammenführen, ohne große RAM-Blobs.
+    function allowedVideoHost(host) {
+        return host === 'video.twimg.com' || host === 'video.pscp.tv' ||
+            host.endsWith('.video.pscp.tv');
+    }
+    function hlsUrl(url) {
+        try {
+            var u = new URL(url);
+            return u.protocol === 'https:' && allowedVideoHost(u.hostname) && /\.m3u8$/i.test(u.pathname);
+        } catch (e) { return false; }
+    }
+
+    function mp4Boxes(bytes, start, end) {
+        start = start || 0;
+        end = end == null ? bytes.length : end;
+        var found = [], view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+        while (start + 8 <= end) {
+            var size = view.getUint32(start), header = 8;
+            if (size === 1) {
+                if (start + 16 > end) throw new Error('MP4: ungültige Boxgröße');
+                size = view.getUint32(start + 8) * 4294967296 + view.getUint32(start + 12);
+                header = 16;
+            }
+            if (size === 0) size = end - start;
+            if (size < header || start + size > end) throw new Error('MP4: beschädigtes Fragment');
+            found.push({ start: start, end: start + size, head: header,
+                type: String.fromCharCode.apply(null, Array.from(bytes.slice(start + 4, start + 8))) });
+            start += size;
+        }
+        if (start !== end) throw new Error('MP4: überzählige Bytes');
+        return found;
+    }
+    function mp4First(bytes, type, start, end) {
+        return mp4Boxes(bytes, start, end).find(function (b) { return b.type === type; });
+    }
+    function mp4Children(bytes, b) { return mp4Boxes(bytes, b.start + b.head, b.end); }
+    function mp4Path(bytes, types) {
+        var b = { start: 0, end: bytes.length, head: 0 };
+        for (var i = 0; i < types.length; i++) {
+            b = mp4First(bytes, types[i], b.start + b.head, b.end);
+            if (!b) throw new Error('MP4: fehlende ' + types[i] + '-Box');
+        }
+        return b;
+    }
+    function mp4Piece(bytes, b) { return bytes.slice(b.start, b.end); }
+    function mp4Concat(parts) {
+        var length = 0;
+        for (var i = 0; i < parts.length; i++) length += parts[i].length;
+        var out = new Uint8Array(length), offset = 0;
+        for (var j = 0; j < parts.length; j++) { out.set(parts[j], offset); offset += parts[j].length; }
+        return out;
+    }
+    function mp4Box(type, payload) {
+        var out = new Uint8Array(payload.length + 8), view = new DataView(out.buffer);
+        view.setUint32(0, out.length);
+        for (var i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+        out.set(payload, 8);
+        return out;
+    }
+    function mp4GetId(bytes, b, offset) {
+        return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(b.start + offset);
+    }
+    function mp4SetId(bytes, b, offset, id) {
+        new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(b.start + offset, id);
+    }
+    function mp4CombinedInit(videoInit, audioInit) {
+        // X liefert oft zwei einzelne MP4-Tracks. Die Boxen der Audio-Spur
+        // werden mit eigener Track-ID in den gemeinsamen moov übernommen.
+        var vMoov = mp4Path(videoInit, ['moov']);
+        var aMoov = mp4Path(audioInit, ['moov']);
+        var vTracks = mp4Children(videoInit, vMoov).filter(function (b) { return b.type === 'trak'; });
+        var aTracks = mp4Children(audioInit, aMoov).filter(function (b) { return b.type === 'trak'; });
+        if (vTracks.length !== 1 || aTracks.length !== 1) throw new Error('HLS: unerwartete Track-Anzahl');
+        var videoTkhd = mp4Path(videoInit, ['moov', 'trak', 'tkhd']);
+        var audioTkhd = mp4Path(audioInit, ['moov', 'trak', 'tkhd']);
+        var trackOffset = function (bytes, b) { return bytes[b.start + 8] === 1 ? 28 : 20; };
+        var videoId = mp4GetId(videoInit, videoTkhd, trackOffset(videoInit, videoTkhd));
+        var audioId = mp4GetId(audioInit, audioTkhd, trackOffset(audioInit, audioTkhd));
+        var newAudioId = videoId === 1 ? 2 : 1;
+        var audioTrack = mp4Piece(audioInit, aTracks[0]);
+        var tkh = mp4First(audioTrack, 'tkhd', 8, audioTrack.length);
+        if (!tkh) throw new Error('HLS: Audio-Trackheader fehlt');
+        mp4SetId(audioTrack, tkh, trackOffset(audioTrack, tkh), newAudioId);
+        var videoMvex = mp4Path(videoInit, ['moov', 'mvex']);
+        var audioMvex = mp4Path(audioInit, ['moov', 'mvex']);
+        var aTrex = mp4Children(audioInit, audioMvex).find(function (b) { return b.type === 'trex'; });
+        if (!aTrex) throw new Error('HLS: Audio-TREX fehlt');
+        var audioTrex = mp4Piece(audioInit, aTrex);
+        mp4SetId(audioTrex, { start: 0 }, 12, newAudioId);
+        var mvexParts = mp4Children(videoInit, videoMvex).map(function (b) { return mp4Piece(videoInit, b); });
+        mvexParts.push(audioTrex);
+        var newMvex = mp4Box('mvex', mp4Concat(mvexParts));
+        var moovParts = [];
+        mp4Children(videoInit, vMoov).forEach(function (b) {
+            moovParts.push(b.type === 'mvex' ? newMvex : mp4Piece(videoInit, b));
+            if (b.type === 'trak') moovParts.push(audioTrack);
+        });
+        var ftyp = mp4First(videoInit, 'ftyp');
+        if (!ftyp) throw new Error('HLS: ftyp fehlt');
+        return { init: mp4Concat([mp4Piece(videoInit, ftyp), mp4Box('moov', mp4Concat(moovParts))]),
+            originalAudioId: audioId, newAudioId: newAudioId };
+    }
+    function mp4AudioFragment(bytes, originalId, newId) {
+        var out = bytes.slice();
+        mp4Boxes(out).forEach(function (box) {
+            if (box.type !== 'moof') return;
+            mp4Children(out, box).forEach(function (traf) {
+                if (traf.type !== 'traf') return;
+                mp4Children(out, traf).forEach(function (tfhd) {
+                    if (tfhd.type === 'tfhd') {
+                        if (mp4GetId(out, tfhd, 12) !== originalId) throw new Error('HLS: unbekannte Audio-Track-ID');
+                        mp4SetId(out, tfhd, 12, newId);
+                    }
+                });
+            });
+        });
+        return out;
+    }
+    function hlsAttributes(value) {
+        var result = {}, re = /([A-Z0-9-]+)=("[^"]*"|[^,]*)/g, m;
+        while ((m = re.exec(value))) result[m[1]] = m[2].charAt(0) === '"' ? m[2].slice(1, -1) : m[2];
+        return result;
+    }
+    function hlsPlaylist(text, baseUrl) {
+        if (!/^#EXTM3U(?:\s|$)/.test(text)) throw new Error('HLS: ungültige Playlist');
+        var lines = text.replace(/\r/g, '').split('\n').map(function (s) { return s.trim(); });
+        var variants = [], audio = [], entries = [], initUrl = null, endlist = false;
+        var pendingInf = null, duration = 0, discontinuities = 0;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (!line) continue;
+            if (line.indexOf('#EXT-X-STREAM-INF:') === 0) {
+                var attr = hlsAttributes(line.slice(18));
+                var candidate = lines[++i];
+                if (!candidate || candidate.charAt(0) === '#') throw new Error('HLS: ungültige Variant-Playlist');
+                variants.push({ url: new URL(candidate, baseUrl).href, attr: attr });
+            } else if (line.indexOf('#EXT-X-MEDIA:') === 0) {
+                var at = hlsAttributes(line.slice(13));
+                if (at.TYPE === 'AUDIO' && at.URI) audio.push({ url: new URL(at.URI, baseUrl).href, attr: at });
+            } else if (line.indexOf('#EXT-X-MAP:') === 0) {
+                var ma = hlsAttributes(line.slice(11));
+                if (!ma.URI || ma.BYTERANGE) throw new Error('HLS: nicht unterstütztes EXT-X-MAP');
+                initUrl = new URL(ma.URI, baseUrl).href;
+            } else if (line.indexOf('#EXTINF:') === 0) {
+                pendingInf = Number(line.slice(8).split(',')[0]);
+                if (!isFinite(pendingInf) || pendingInf <= 0) throw new Error('HLS: ungültige Segmentdauer');
+            } else if (line.indexOf('#EXT-X-KEY:') === 0 && !/METHOD=NONE(?:,|$)/.test(line)) {
+                throw new Error('HLS: verschlüsselter Stream nicht unterstützt');
+            } else if (line.indexOf('#EXT-X-BYTERANGE:') === 0) {
+                throw new Error('HLS: Byte-Range nicht unterstuetzt');
+            } else if (line.indexOf('#EXT-X-DISCONTINUITY') === 0) {
+                discontinuities++;
+            } else if (line === '#EXT-X-ENDLIST') {
+                endlist = true;
+            } else if (line.charAt(0) !== '#' && pendingInf !== null) {
+                entries.push({ url: new URL(line, baseUrl).href, time: duration, duration: pendingInf });
+                duration += pendingInf;
+                pendingInf = null;
+            }
+        }
+        return { variants: variants, audio: audio, initUrl: initUrl, segments: entries, endlist: endlist, discontinuities: discontinuities };
+    }
+    // GM_xmlhttpRequest läuft im Tampermonkey-Hintergrund. Für Broadcast-
+    // CDNs kann die Browser-Seite einen anderen, funktionierenden Netzpfad
+    // besitzen. Nach einem erfolgreichen Browser-Fallback diesen bevorzugen.
+    var hlsPreferBrowserFetch = false;
+    function hlsFetchBrowser(url, kind, signal) {
+        var browserFetch = typeof fetch === 'function' ? fetch :
+            (typeof window !== 'undefined' && typeof window.fetch === 'function' ? window.fetch.bind(window) : null);
+        if (!browserFetch) return Promise.reject(new Error('Browser-Fetch nicht verfügbar'));
+        ensureNotCancelled(signal);
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = controller ? setTimeout(function () { controller.abort(); }, CONFIG.requestTimeoutMs) : null;
+        var cleanupAbort = onDownloadAbort(signal, function () { if (controller) controller.abort(); });
+        return Promise.resolve().then(function () {
+            ensureNotCancelled(signal);
+            return browserFetch(url, { method: 'GET', mode: 'cors', credentials: 'omit',
+                signal: controller ? controller.signal : undefined });
+        }).then(async function (response) {
+            if (!response || !response.ok) throw new Error('Browser HTTP ' + (response ? response.status : '?'));
+            if (kind === 'text') return response.text();
+            var data = new Uint8Array(await response.arrayBuffer());
+            if (!data.length) throw new Error('Browser-Fetch: leeres Segment');
+            return data;
+        }).finally(function () {
+            if (timer) clearTimeout(timer);
+            cleanupAbort();
+        });
+    }
+    function hlsFetchGM(url, kind, signal) {
+        ensureNotCancelled(signal);
+        return new Promise(function (resolve, reject) {
+            var handle = null, settled = false;
+            var cleanupAbort = function () {};
+            function settle(err, data) {
+                if (settled) return;
+                settled = true;
+                cleanupAbort();
+                if (err) reject(err); else resolve(data);
+            }
+            function abortRequest() {
+                try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (_) {}
+                settle(downloadAbortError());
+            }
+            cleanupAbort = onDownloadAbort(signal, abortRequest);
+            if (signal && signal.aborted) { abortRequest(); return; }
+            var opts = { method: 'GET', url: url, timeout: CONFIG.requestTimeoutMs,
+                onload: function (r) {
+                    if (signal && signal.aborted) { settle(downloadAbortError()); return; }
+                    if (r.status < 200 || r.status >= 300) {
+                        settle(new Error('GM HTTP ' + r.status)); return;
+                    }
+                    if (kind === 'text') settle(null, r.responseText || r.response);
+                    else if (r.response && r.response.byteLength) settle(null, new Uint8Array(r.response));
+                    else settle(new Error('GM: leeres Segment'));
+                },
+                onerror: function (r) {
+                    if (signal && signal.aborted) { settle(downloadAbortError()); return; }
+                    var detail = String((r && (r.error || r.statusText)) || '');
+                    var category = /not.permitted|not.whitelisted|refused to connect|@connect/i.test(detail) ? 'Zugriff nicht erlaubt' :
+                        /blacklist/i.test(detail) ? 'Domain gesperrt' : 'Netzwerkfehler';
+                    settle(new Error('GM: ' + category));
+                },
+                ontimeout: function () { settle(new Error('GM: Timeout')); },
+                onabort: function () { settle(signal && signal.aborted ? downloadAbortError() : new Error('GM: abgebrochen')); }
+            };
+            if (kind !== 'text') opts.responseType = 'arraybuffer';
+            try {
+                handle = GM_xmlhttpRequest(opts);
+                if (signal && signal.aborted) abortRequest();
+            } catch (e) { settle(new Error('GM: Aufruf gescheitert')); }
+        });
+    }
+    async function hlsFetch(url, kind, signal) {
+        ensureNotCancelled(signal);
+        if (!hlsUrl(url) && !hlsMediaPartUrl(url)) throw new Error('HLS: unzulässige Medienadresse');
+        var host = new URL(url).hostname;
+        var first = hlsPreferBrowserFetch ? hlsFetchBrowser : hlsFetchGM;
+        var second = hlsPreferBrowserFetch ? hlsFetchGM : hlsFetchBrowser;
+        try { return await first(url, kind, signal); }
+        catch (firstError) {
+            if (isCancellation(firstError, signal)) throw downloadAbortError();
+            try {
+                var value = await second(url, kind, signal);
+                ensureNotCancelled(signal);
+                if (!hlsPreferBrowserFetch) hlsPreferBrowserFetch = true;
+                return value;
+            } catch (secondError) {
+                if (isCancellation(secondError, signal)) throw downloadAbortError();
+                throw new Error('HLS-Zugriff auf ' + host + ' fehlgeschlagen: ' +
+                    firstError.message + '; zweiter Abruf: ' + secondError.message);
+            }
+        }
+    }
+    function hlsMediaPartUrl(url) {
+        try {
+            var u = new URL(url);
+            return u.protocol === 'https:' && allowedVideoHost(u.hostname) &&
+                /\.(?:m4s|mp4|cmfv|cmfa|ts|m4a)$/i.test(u.pathname);
+        } catch (e) { return false; }
+    }
+    async function hlsResolve(url, signal) {
+        var master = hlsPlaylist(await hlsFetch(url, 'text', signal), url);
+        var selected = null, audioUrl = null;
+        if (master.variants.length) {
+            var isAudioOnly = function (v) {
+                return (/mp4a|aac/i.test(v.attr.CODECS || '') && !/avc1|hvc1|hev1/i.test(v.attr.CODECS || '')) ||
+                    /\/pl\/mp4a\//.test(v.url);
+            };
+            var videoVariants = master.variants.filter(function (v) { return !isAudioOnly(v); });
+            var audioVariants = master.variants.filter(isAudioOnly);
+            videoVariants.sort(function (a, b) {
+                return Number(b.attr['AVERAGE-BANDWIDTH'] || b.attr.BANDWIDTH || 0) -
+                    Number(a.attr['AVERAGE-BANDWIDTH'] || a.attr.BANDWIDTH || 0);
+            });
+            audioVariants.sort(function (a, b) { return Number(b.attr.BANDWIDTH || 0) - Number(a.attr.BANDWIDTH || 0); });
+            selected = videoVariants[0];
+            if (!selected) throw new Error('HLS: keine Video-Variante');
+            var group = selected.attr.AUDIO;
+            var candidateAudio = master.audio.filter(function (v) { return !group || v.attr['GROUP-ID'] === group; });
+            candidateAudio.sort(function (a, b) { return Number(b.attr.DEFAULT === 'YES') - Number(a.attr.DEFAULT === 'YES'); });
+            audioUrl = candidateAudio.length ? candidateAudio[0].url :
+                (audioVariants.length ? audioVariants[0].url : null);
+        }
+        var videoUrl = selected ? selected.url : url;
+        var video = selected ? hlsPlaylist(await hlsFetch(videoUrl, 'text', signal), videoUrl) : master;
+        // Broadcast-Replays werden haeufig als MPEG-TS statt fMP4 ausgeliefert.
+        var transportStream = !video.initUrl && video.segments.length && video.segments.every(function (seg) {
+            return /\.ts$/i.test(new URL(seg.url).pathname);
+        });
+        if ((!video.initUrl && !transportStream) || !video.segments.length)
+            throw new Error('HLS: weder fMP4- noch TS-Videosegmente');
+        if (!transportStream && video.discontinuities)
+            throw new Error('HLS: fMP4 mit Zeitachsenwechsel nicht unterstuetzt');
+        if (!video.endlist) throw new Error('HLS: laufender Stream ohne vollständiges Aufnahmeende');
+        if (video.segments.length > 12000) throw new Error('HLS: Segmentzahl zu groß');
+        var audio = null;
+        if (audioUrl) {
+            audio = hlsPlaylist(await hlsFetch(audioUrl, 'text', signal), audioUrl);
+            if (!audio.initUrl || !audio.endlist || !audio.segments.length) throw new Error('HLS: Audio-Aufnahme nicht vollständig');
+            if (audio.segments.length > 12000) throw new Error('HLS: Audio-Segmentzahl zu groß');
+        }
+        if (transportStream && audio) throw new Error('HLS: TS-Aufnahme mit separater Tonspur nicht unterstuetzt');
+        ensureNotCancelled(signal);
+        return { video: video, audio: audio, transportStream: transportStream };
+    }
+    async function downloadHlsFile(url, file, onProgress, signal) {
+        var writable = null;
+        try {
+            ensureNotCancelled(signal);
+            var playlist = await hlsResolve(url, signal);
+            ensureNotCancelled(signal);
+            // fMP4-Init enthält die Codec-Informationen; erst danach schreiben.
+            if (playlist.transportStream) {
+                ensureNotCancelled(signal);
+                writable = await file.createWritable();
+                ensureNotCancelled(signal);
+                var tsCount = 0;
+                for (var si = 0; si < playlist.video.segments.length; si++) {
+                    var segment = await hlsFetch(playlist.video.segments[si].url, 'bytes', signal);
+                    ensureNotCancelled(signal);
+                    // MPEG-TS besteht aus Paketen zu je 188 Bytes mit Sync 0x47.
+                    if (segment.length < 376 || segment.length % 188 !== 0 || segment[0] !== 0x47 || segment[188] !== 0x47)
+                        throw new Error('HLS: ungueltiges MPEG-TS-Segment');
+                    await writable.write(segment);
+                    ensureNotCancelled(signal);
+                    tsCount += segment.length;
+                    if (onProgress) onProgress({ done: si + 1, total: playlist.video.segments.length,
+                        percent: Math.round((si + 1) * 100 / playlist.video.segments.length), segmented: true });
+                }
+                if (!tsCount) throw new Error('HLS: leere TS-Aufzeichnung');
+                ensureNotCancelled(signal);
+                await writable.close();
+                writable = null;
+                return;
+            }
+            var videoInit = await hlsFetch(playlist.video.initUrl, 'bytes', signal);
+            var audioInit = playlist.audio ? await hlsFetch(playlist.audio.initUrl, 'bytes', signal) : null;
+            var muxInfo = audioInit ? mp4CombinedInit(videoInit, audioInit) : null;
+            var init = muxInfo ? muxInfo.init : videoInit;
+            if (!mp4First(init, 'moov') || !mp4First(init, 'ftyp')) throw new Error('HLS: ungültige MP4-Initialisierung');
+            var jobs = [];
+            playlist.video.segments.forEach(function (s) { jobs.push({ url: s.url, time: s.time, kind: 'video' }); });
+            if (playlist.audio) playlist.audio.segments.forEach(function (s) { jobs.push({ url: s.url, time: s.time, kind: 'audio' }); });
+            jobs.sort(function (a, b) { return a.time - b.time || (a.kind === 'video' ? -1 : 1); });
+            ensureNotCancelled(signal);
+            writable = await file.createWritable();
+            ensureNotCancelled(signal);
+            await writable.write(init);
+            for (var i = 0; i < jobs.length; i++) {
+                var bytes = await hlsFetch(jobs[i].url, 'bytes', signal);
+                ensureNotCancelled(signal);
+                if (!mp4Boxes(bytes).some(function (b) { return b.type === 'moof'; }) ||
+                    !mp4Boxes(bytes).some(function (b) { return b.type === 'mdat'; })) {
+                    throw new Error('HLS: unvollständiges MP4-Medienfragment');
+                }
+                if (jobs[i].kind === 'audio') bytes = mp4AudioFragment(bytes, muxInfo.originalAudioId, muxInfo.newAudioId);
+                await writable.write(bytes);
+                ensureNotCancelled(signal);
+                if (onProgress) onProgress({ done: i + 1, total: jobs.length, percent: Math.round((i + 1) * 100 / jobs.length), segmented: true });
+            }
+            ensureNotCancelled(signal);
+            await writable.close();
+            writable = null;
+        } catch (e) {
+            if (writable) try { await writable.abort(); } catch (_) { /* unveränderte Datei schützen */ }
+            throw e;
+        }
+    }
+
+    function isProgressiveVideoUrl(url) {
+        try {
+            var u = new URL(url);
+            if (u.protocol !== 'https:' || u.hostname !== 'video.twimg.com') return false;
+            // HLS-Initsegmente enthalten vor der Auflösung Zeitbereiche /0/0/.
+            // Nur progressive MP4-Pfade (inkl. älterem /pu/vid/) und GIF-MP4.
+            return /\/vid\/(?:[a-z][a-z0-9_-]*\/)?\d+x\d+\/[^/]+\.mp4$/i.test(u.pathname) ||
+                /^\/tweet_video\/[^/]+\.mp4$/i.test(u.pathname);
+        } catch (e) { return false; }
+    }
 
     function isMediaUrl(url) {
         if (!url || typeof url !== 'string') return false;
@@ -421,7 +867,7 @@
         if (url.indexOf('pbs.twimg.com/media/') !== -1) return true;
         // Artikel-Card-Bilder (verlinkte Artikel, pbs.twimg.com/card_img/...)
         if (url.indexOf('pbs.twimg.com/card_img/') !== -1) return true;
-        if (url.indexOf('video.twimg.com/') !== -1) return true;
+        if (url.indexOf('video.twimg.com/') !== -1) return isProgressiveVideoUrl(url) || hlsUrl(url);
         // Video-Poster als Medien akzeptieren (letzter Notnagel: Standbilder,
         // wenn die X-API die echten Videos nicht liefert — z. B. bei gekürzten
         // Konversations-Antworten). tweet_video_thumb wird von
@@ -676,9 +1122,16 @@
                 for (var i = 0; i < obj.length; i++) walk(obj[i]);
                 return;
             }
-            var id = obj.id_str || obj.id || null;
-            if (id && (obj.extended_entities || obj.entities || obj.full_text)) {
-                map.set(String(id), obj);
+            var id = obj.rest_id || obj.id_str || obj.id ||
+                (obj.legacy && obj.legacy.id_str) || null;
+            if (id && (obj.extended_entities || obj.entities || obj.full_text ||
+                obj.card || (obj.legacy && (obj.legacy.extended_entities || obj.legacy.card)))) {
+                var prior = map.get(String(id));
+                // Ein späteres abgespecktes Objekt darf die vollständigere
+                // Tweet-/Card-Repräsentation nicht überschreiben.
+                if (!prior || apiMediaFromTweet(obj).length > apiMediaFromTweet(prior).length) {
+                    map.set(String(id), obj);
+                }
             }
             for (var key in obj) {
                 var v = obj[key];
@@ -694,20 +1147,178 @@
      *  - video/animated_gif: MP4-Variante mit höchster Bitrate
      * GIFs sind MP4-Streams und werden wie Videos mit .mp4 benannt.
      */
-    function apiMediaFromTweet(tweetObj) {
-        var media = [];
-        var sources = [];
-        if (tweetObj.extended_entities && Array.isArray(tweetObj.extended_entities.media)) {
-            for (var e = 0; e < tweetObj.extended_entities.media.length; e++) {
-                sources.push(tweetObj.extended_entities.media[e]);
+    // Player-Card-Bindings werden von X sowohl als Liste mit {key,value}
+    // als auch als Objekt mit direkten keys geliefert (manchmal unter legacy).
+    function cardBinding(card, name) {
+        var values = card && (card.binding_values || (card.legacy && card.legacy.binding_values));
+        if (!values) return null;
+        var raw = null;
+        if (Array.isArray(values)) {
+            for (var i = 0; i < values.length; i++) {
+                if (values[i] && values[i].key === name) { raw = values[i].value; break; }
+            }
+        } else {
+            raw = values[name];
+        }
+        if (typeof raw === 'string') return raw;
+        if (!raw || typeof raw !== 'object') return null;
+        return typeof raw.string_value === 'string' ? raw.string_value :
+            (raw.value && typeof raw.value.string_value === 'string' ? raw.value.string_value : null);
+    }
+
+    function broadcastIdOf(url) {
+        if (!url || typeof url !== 'string') return null;
+        try {
+            var parsed = new URL(url, location.origin);
+            if (!['x.com', 'twitter.com', 'www.x.com', 'www.twitter.com'].includes(parsed.hostname)) return null;
+            var match = parsed.pathname.match(/^\/i\/broadcasts\/([A-Za-z0-9]+)(?:\/|$)/);
+            return match ? match[1] : null;
+        } catch (e) { return null; }
+    }
+    function broadcastItem(id) {
+        return { url: 'https://x.com/i/broadcasts/' + id, ext: 'ts', broadcastId: id };
+    }
+    function broadcastFromDom(tweet) {
+        var anchors = tweet.querySelectorAll('a[href*="/i/broadcasts/"]');
+        for (var i = 0; i < anchors.length; i++) {
+            if (anchors[i].closest(CONFIG.tweetSelector) !== tweet) continue;
+            var id = broadcastIdOf(anchors[i].href || anchors[i].getAttribute('href'));
+            if (id) return broadcastItem(id);
+        }
+        return null;
+    }
+    function gmBroadcastJson(url) {
+        var cookies = getCookies();
+        return new Promise(function (resolve, reject) {
+            var headers = {authorization: 'Bearer ' + (liveToken || CONFIG.api.guestBearer),
+                'x-twitter-active-user': 'yes', 'x-csrf-token': cookies.ct0 || '',
+                'x-twitter-client-language': cookies.lang || 'en'};
+            if (cookies.gt) headers['x-guest-token'] = cookies.gt;
+            GM_xmlhttpRequest({method: 'GET', url: url, timeout: CONFIG.requestTimeoutMs,
+                headers: headers,
+                onload: function (r) {
+                    if (r.status !== 200) return reject(new Error('Broadcast API HTTP ' + r.status));
+                    try { resolve(JSON.parse(r.responseText)); }
+                    catch (e) { reject(new Error('Broadcast: Antwort unlesbar')); }
+                },
+                onerror: function () { reject(new Error('Broadcast: Netzwerkfehler')); },
+                ontimeout: function () { reject(new Error('Broadcast: API-Timeout')); }
+            });
+        });
+    }
+    async function broadcastPlaybackUrl(id) {
+        // X-Broadcast-Aufloesung: Broadcast-ID -> media_key -> Replay-Manifest.
+        log.info('Lade Broadcast-Metadaten (ID: ' + id + ')');
+        var show = await gmBroadcastJson(location.origin + '/i/api/1.1/broadcasts/show.json?ids=' + encodeURIComponent(id));
+        var entry = show.broadcasts && show.broadcasts[id];
+        var mediaKey = entry && entry.media_key;
+        if (!mediaKey) throw new Error('Broadcast: media_key nicht verfuegbar');
+        log.info('Broadcast-Medienschluessel gefunden; lade Replay-Adresse.');
+        var data = await gmBroadcastJson(location.origin + '/i/api/1.1/live_video_stream/status/' +
+            encodeURIComponent(mediaKey) + '?client=web&use_syndication_guest_id=false&cookie_set_host=x.com');
+        var source = data.source || {};
+        var candidates = [source.noRedirectPlaybackUrl, source.location, source.url];
+        for (var i = 0; i < candidates.length; i++) {
+            var raw = candidates[i];
+            if (!raw) continue;
+            if (hlsUrl(raw)) { log.info('Replay-CDN: ' + new URL(raw).hostname); return raw; }
+            try {
+                // X kann die eigentliche CDN-URL in einem erlaubten Redirect-Link kapseln.
+                var wrapped = new URL(raw);
+                if (['x.com', 'twitter.com'].includes(wrapped.hostname)) {
+                    var nested = wrapped.searchParams.get('url');
+                    if (nested && hlsUrl(nested)) { log.info('Replay-CDN: ' + new URL(nested).hostname); return nested; }
+                }
+            } catch (e) { /* naechster Kandidat */ }
+        }
+        throw new Error('Broadcast: keine zulaessige Replay-Playlist erhalten');
+    }
+
+    function cardMediaFromTweet(tweetObj) {
+        var found = [];
+        var card = tweetObj.card || (tweetObj.legacy && tweetObj.legacy.card);
+        if (!card || typeof card !== 'object') {
+            var tweetUrls = (tweetObj.legacy || tweetObj).entities;
+            var expanded = tweetUrls && tweetUrls.urls;
+            if (Array.isArray(expanded)) {
+                expanded.forEach(function (u) {
+                    var id = broadcastIdOf(u.expanded_url || u.url);
+                    if (id && !found.some(function (f) { return f.broadcastId === id; })) found.push(broadcastItem(id));
+                });
+            }
+            return found;
+        }
+        var broadcastId = broadcastIdOf(cardBinding(card, 'broadcast_url')) ||
+            broadcastIdOf(cardBinding(card, 'player_url')) ||
+            broadcastIdOf(cardBinding(card, 'url')) || broadcastIdOf(card.url);
+        var ent = (tweetObj.legacy || tweetObj).entities;
+        var links = ent && ent.urls;
+        if (!broadcastId && Array.isArray(links)) {
+            for (var li = 0; li < links.length; li++) {
+                broadcastId = broadcastIdOf(links[li].expanded_url || links[li].url);
+                if (broadcastId) break;
             }
         }
-        if (!sources.length && tweetObj.entities && Array.isArray(tweetObj.entities.media)) {
-            for (var f = 0; f < tweetObj.entities.media.length; f++) {
-                sources.push(tweetObj.entities.media[f]);
+        if (broadcastId && (/(?:^|:)broadcast$/.test(card.name || '') ||
+            (links && links.some && links.some(function (v) { return broadcastIdOf(v.expanded_url) === broadcastId; })))) {
+            // Broadcast und dessen generischer Player-Link sind dieselbe Aufnahme.
+            found.push(broadcastItem(broadcastId));
+            return found;
+        }
+
+        function addVideoInfo(entry) {
+            if (!entry || !entry.video_info || !Array.isArray(entry.video_info.variants)) return;
+            var best = null, playlist = null;
+            for (var i = 0; i < entry.video_info.variants.length; i++) {
+                var v = entry.video_info.variants[i];
+                if (!v || !v.url) continue;
+                if (v.content_type === 'video/mp4' && isProgressiveVideoUrl(v.url) &&
+                    (!best || (v.bitrate || 0) > (best.bitrate || 0))) best = v;
+                else if (hlsUrl(v.url) && !playlist) playlist = v;
+            }
+            if (best || playlist) {
+                var chosen = (best || playlist).url;
+                var replay = !!playlist && new URL(chosen).hostname !== 'video.twimg.com';
+                found.push({ url: chosen, ext: replay ? 'ts' : 'mp4', hls: !best, broadcast: replay });
             }
         }
 
+        // Unified Cards enthalten echte media_entities (nicht nur Poster).
+        var unified = cardBinding(card, 'unified_card');
+        if (unified && unified.length < 1024 * 1024) {
+            try {
+                var data = JSON.parse(unified);
+                var entities = data && data.media_entities;
+                if (entities && typeof entities === 'object') {
+                    Object.keys(entities).forEach(function (id) { addVideoInfo(entities[id]); });
+                }
+            } catch (e) { log.warn('Player-Card: unified_card nicht lesbar.'); }
+        }
+        // Einige Card-Antworten liefern media_entities ohne JSON-Wrapper.
+        var directEntities = card.media_entities || (card.legacy && card.legacy.media_entities);
+        if (directEntities && typeof directEntities === 'object') {
+            Object.keys(directEntities).forEach(function (id) { addVideoInfo(directEntities[id]); });
+        }
+        // Player Cards können stattdessen eine direkte Videodatei nennen.
+        // Manifest-/Segmentadressen werden ausdrücklich NICHT übernommen.
+        var playerUrl = cardBinding(card, 'player_stream_url');
+        if (playerUrl && (isProgressiveVideoUrl(playerUrl) || hlsUrl(playerUrl))) {
+            var isReplay = hlsUrl(playerUrl) && new URL(playerUrl).hostname !== 'video.twimg.com';
+            found.push({ url: playerUrl, ext: isReplay ? 'ts' : 'mp4', hls: hlsUrl(playerUrl), broadcast: isReplay });
+        }
+        return found;
+    }
+
+    function apiMediaFromTweet(tweetObj) {
+        if (!tweetObj || typeof tweetObj !== 'object') return [];
+        var legacy = tweetObj.legacy || tweetObj;
+        var media = [];
+        var sources = [];
+        if (legacy.extended_entities && Array.isArray(legacy.extended_entities.media)) {
+            sources = legacy.extended_entities.media;
+        } else if (legacy.entities && Array.isArray(legacy.entities.media)) {
+            sources = legacy.entities.media;
+        }
         for (var i = 0; i < sources.length; i++) {
             var m = sources[i];
             if (!m) continue;
@@ -715,17 +1326,46 @@
                 media.push({ url: originalImageUrl(m.media_url_https), ext: extFromUrl(m.media_url_https) || 'jpg' });
             } else if (m.type === 'video' || m.type === 'animated_gif') {
                 var variants = (m.video_info && m.video_info.variants) || [];
-                var best = null;
+                var best = null, playlist = null;
                 for (var j = 0; j < variants.length; j++) {
                     var v = variants[j];
-                    if (v && v.content_type === 'video/mp4' && v.url && v.url.indexOf('blob:') === -1) {
+                    if (!v || !v.url) continue;
+                    if (v.content_type === 'video/mp4' && isProgressiveVideoUrl(v.url)) {
                         if (!best || (v.bitrate || 0) > (best.bitrate || 0)) best = v;
-                    }
+                    } else if (hlsUrl(v.url) && !playlist) playlist = v;
                 }
-                if (best && best.url) media.push({ url: best.url, ext: 'mp4' });
+                if (best || playlist) media.push({ url: (best || playlist).url, ext: 'mp4', hls: !best });
             }
         }
+        // Gezielt Card-Medien ergänzen, ohne bereits vorhandene MP4 doppelt
+        // herunterzuladen. Ein echtes Tweet-Video hat dabei Vorrang.
+        var cardItems = cardMediaFromTweet(tweetObj);
+        for (var k = 0; k < cardItems.length; k++) {
+            var candidate = cardItems[k];
+            var id = mediaIdOf(candidate.url);
+            if (!media.some(function (item) {
+                return item.url === candidate.url || (id && mediaIdOf(item.url) === id);
+            })) media.push(candidate);
+        }
         return media;
+    }
+
+    function renderedTweetMedia(tweet, statusId) {
+        // Ausschließlich den Ziel-Tweet lesen, nicht dessen Nachbarn/Replies.
+        // React-Metadaten sind optional; kein Eingriff in X oder dessen APIs.
+        try {
+            var key = Object.keys(tweet).filter(function (k) { return k.indexOf('__reactFiber$') === 0; })[0];
+            var fiber = key && tweet[key];
+            for (var depth = 0; fiber && depth < 30; depth++, fiber = fiber.return) {
+                var value = fiber.memoizedProps && fiber.memoizedProps.tweet;
+                if (!value) continue;
+                var legacy = value.legacy || value;
+                if (String(value.rest_id || legacy.id_str || legacy.id) !== String(statusId)) continue;
+                var media = apiMediaFromTweet(value);
+                if (media.length) return media;
+            }
+        } catch (e) { /* X kann die internen Props ändern: regulärer Fallback. */ }
+        return [];
     }
 
     function originalImageUrl(src) {
@@ -749,8 +1389,9 @@
         var media = tweet ? apiMediaFromTweet(tweet) : [];
 
         if (!media.length && tweet) {
-            var quotedId = tweet.quoted_status_id_str || tweet.retweeted_status_id_str ||
-                tweet.quoted_status_id || tweet.retweeted_status_id;
+            var quotedSource = tweet.legacy || tweet;
+            var quotedId = quotedSource.quoted_status_id_str || quotedSource.retweeted_status_id_str ||
+                quotedSource.quoted_status_id || quotedSource.retweeted_status_id;
             if (quotedId) {
                 var quoted = map.get(String(quotedId));
                 if (quoted) media = apiMediaFromTweet(quoted);
@@ -1036,7 +1677,12 @@
      * einen 5-min-Stillstands-Watchdog. createWritable/abort schützt vorhandene
      * Dateiinhalte bei Übertragungsfehlern; erst close übernimmt das Ergebnis.
      */
-    async function downloadSelectedFile(url, file, onProgress) {
+    async function downloadSelectedFile(url, file, onProgress, signal) {
+        if (url.indexOf('video.twimg.com/') !== -1 && !isProgressiveVideoUrl(url)) {
+            throw new Error('Kein vollständiges Video: Playlist oder Medienfragment');
+        }
+        ensureNotCancelled(signal);
+        var cleanupAbort = function () {};
         var request = null;
         var reader = null;
         var writable = null;
@@ -1046,6 +1692,9 @@
         var rejectComplete = null;
         var latestResponse = null;
         var resolveComplete;
+        var rejectCancelled;
+        var cancelled = new Promise(function (resolve, reject) { rejectCancelled = reject; });
+        cancelled.catch(function () {});
         var complete = new Promise(function (resolve, reject) {
             resolveComplete = resolve;
             rejectComplete = reject;
@@ -1055,6 +1704,7 @@
         function fail(err) {
             if (transferError) return;
             transferError = err;
+            rejectCancelled(err);
             if (rejectResponse) rejectResponse(err);
             if (rejectComplete) rejectComplete(err);
             try { if (request) request.abort(); } catch (e) {}
@@ -1067,6 +1717,8 @@
             }, 5 * 60 * 1000);
         }
         try {
+            cleanupAbort = onDownloadAbort(signal, function () { fail(downloadAbortError()); });
+            ensureNotCancelled(signal);
             arm();
             var response = await new Promise(function (resolve, reject) {
                 rejectResponse = reject;
@@ -1108,8 +1760,10 @@
                 });
             });
             if (transferError) throw transferError;
+            ensureNotCancelled(signal);
             reader = response.response.getReader();
             writable = await file.createWritable();
+            ensureNotCancelled(signal);
             function contentLength(res) {
                 var length = /(?:^|\r?\n)content-length:\s*(\d+)/i.exec(res.responseHeaders || '');
                 return length ? Number(length[1]) : 0;
@@ -1117,11 +1771,13 @@
             var total = contentLength(response);
             var done = 0;
             while (true) {
-                var part = await reader.read();
+                var part = await Promise.race([reader.read(), cancelled]);
                 if (transferError) throw transferError;
+                ensureNotCancelled(signal);
                 if (part.done) break;
                 arm();
                 await writable.write(part.value);
+                ensureNotCancelled(signal);
                 done += part.value.byteLength;
                 total = contentLength(latestResponse || response);
                 if (typeof onProgress === 'function') onProgress({ done: done, total: total });
@@ -1131,6 +1787,7 @@
             if (transferError) throw transferError;
             total = contentLength(finalResponse);
             if (!done || (total && done !== total)) throw new Error('Download unvollständig');
+            ensureNotCancelled(signal);
             await writable.close();
             writable = null;
         } catch (err) {
@@ -1138,8 +1795,9 @@
             if (writable) { try { await writable.abort(); } catch (e) {} }
             throw err;
         } finally {
+            cleanupAbort();
             if (timer) clearTimeout(timer);
-            if (reader) reader.releaseLock();
+            if (reader) try { reader.releaseLock(); } catch (_) {}
         }
     }
 
@@ -1148,10 +1806,15 @@
      * saveAs fordert einen Dialog an; wann er sichtbar wird, bestimmt der
      * Browser/Downloadmodus (im Standardmodus ggf. erst nach dem Transfer).
      */
-    function downloadUrl(url, filename, saveAs, onProgress) {
+    function downloadUrl(url, filename, saveAs, onProgress, signal) {
+        if (url.indexOf('video.twimg.com/') !== -1 && !isProgressiveVideoUrl(url)) {
+            return Promise.reject(new Error('Kein vollständiges Video: Playlist oder Medienfragment'));
+        }
+        ensureNotCancelled(signal);
         return new Promise(function (resolve, reject) {
             var settled = false;
             var handle = null;
+            var cleanupAbort = function () {};
             var lastActivity = Date.now();
             // 5 Minuten Stillstand statt starrer 65 s: der native Modus liefert
             // keinen onprogress, ein laufender 5-MB-Download über 75 s darf
@@ -1164,6 +1827,7 @@
                 if (settled) return;
                 settled = true;
                 if (timer) clearTimeout(timer);
+                cleanupAbort();
                 try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (e) {}
                 reject(new Error(message));
             }
@@ -1187,6 +1851,7 @@
                     if (settled) return;
                     settled = true;
                     if (timer) clearTimeout(timer);
+                    cleanupAbort();
                     fn(arg);
                 };
             }
@@ -1216,12 +1881,28 @@
             };
             if (typeof onProgress === 'function') {
                 opts.onprogress = function (progress) {
+                    if (settled || (signal && signal.aborted)) return;
                     lastActivity = Date.now();
                     onProgress(progress);
                 };
             }
+            cleanupAbort = onDownloadAbort(signal, function () {
+                if (settled) return;
+                settled = true;
+                if (timer) clearTimeout(timer);
+                cleanupAbort();
+                try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (_) {}
+                reject(downloadAbortError());
+            });
+            if (signal && signal.aborted) {
+                fail('Download abgebrochen');
+                return;
+            }
             try {
                 handle = GM_download(opts);
+                if (signal && signal.aborted) {
+                    try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (_) {}
+                }
             } catch (err) {
                 fail('GM_download: ' + (err && err.message ? err.message : String(err)));
             }
@@ -1327,9 +2008,71 @@
 
     // ============================ Button-Verhalten =========================
 
+    var runningDownloads = new WeakMap();
     function setBusy(btn, busy) {
-        btn.disabled = busy;
-        btn.title = busy ? 'Lädt Medien …' : 'Medien herunterladen';
+        // Ein laufender Download darf den Button nicht deaktivieren:
+        // ein erneuter Klick öffnet die Abbruch-Bestätigung.
+        btn.disabled = false;
+        if (busy) btn.setAttribute('aria-busy', 'true');
+        else btn.removeAttribute('aria-busy');
+        btn.title = busy ? 'Download läuft – erneut klicken zum Abbrechen' : 'Medien herunterladen';
+    }
+    function closeCancelPopup(task) {
+        if (!task || !task.popup) return;
+        if (task.closePopup) task.closePopup();
+    }
+    function showCancelPopup(btn, task) {
+        if (!task || task.signal.aborted || task.popup) return;
+        var popup = document.createElement('div');
+        popup.className = 'xloader-cancel-popup';
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-label', 'Download abbrechen?');
+        popup.style.cssText = 'position:fixed;z-index:2147483646;padding:12px 14px;' +
+            'min-width:205px;background:#20262d;color:#fff;border:1px solid #637082;' +
+            'border-radius:11px;box-shadow:0 6px 26px #0007;font:14px/1.5 system-ui,sans-serif;';
+        var caption = document.createElement('div');
+        caption.textContent = 'Download abbrechen?';
+        caption.style.cssText = 'margin-bottom:10px;font-weight:600;';
+        popup.appendChild(caption);
+        var actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;';
+        function makeButton(label, bg) {
+            var el = document.createElement('button');
+            el.type = 'button'; el.textContent = label;
+            el.style.cssText = 'border:0;border-radius:7px;padding:7px 15px;' +
+                'font:600 13px system-ui,sans-serif;cursor:pointer;background:' + bg + ';color:#fff;';
+            return el;
+        }
+        var yes = makeButton('Ja', '#c93543');
+        var no = makeButton('Nein', '#4d5968');
+        actions.appendChild(no); actions.appendChild(yes);
+        popup.appendChild(actions);
+        var cleanup = function () {
+            popup.removeEventListener('keydown', keydown);
+            if (popup.parentNode) popup.remove();
+            if (task.popup === popup) task.popup = null;
+            task.closePopup = null;
+            btn.focus();
+        };
+        function keydown(ev) {
+            if (ev.key === 'Escape') { ev.preventDefault(); cleanup(); }
+        }
+        popup.addEventListener('keydown', keydown);
+        popup.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        no.addEventListener('click', function (ev) { ev.stopPropagation(); cleanup(); });
+        yes.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            cleanup();
+            task.controller.abort();
+        });
+        document.body.appendChild(popup);
+        var rect = btn.getBoundingClientRect();
+        var size = popup.getBoundingClientRect();
+        popup.style.left = Math.max(8, Math.min(window.innerWidth - size.width - 8, rect.right - size.width)) + 'px';
+        popup.style.top = (rect.top >= size.height + 12 ? rect.top - size.height - 8 : rect.bottom + 8) + 'px';
+        task.popup = popup;
+        task.closePopup = cleanup;
+        no.focus();
     }
 
     function getWrap(btn) {
@@ -1342,10 +2085,24 @@
         btn.classList.add('is-error');
         if (wrap) wrap.classList.add('is-error');
         btn.title = message;
+        // Die bisherige 2,5-s-Farbmarkierung war ohne sichtbaren Fehlertext.
+        // Nur textContent: API-/Fehlertexte niemals als HTML interpretieren.
+        var old = document.getElementById('xloader-error-toast');
+        if (old) old.remove();
+        var toast = document.createElement('div');
+        toast.id = 'xloader-error-toast';
+        toast.setAttribute('role', 'alert');
+        toast.style.cssText = 'position:fixed;right:20px;bottom:24px;max-width:min(460px,90vw);' +
+            'padding:12px 16px;background:#25292f;color:white;border:2px solid #ff6677;' +
+            'border-radius:10px;font:14px/1.45 system-ui,sans-serif;z-index:2147483647;' +
+            'box-shadow:0 6px 24px #0005;';
+        toast.textContent = 'xLoader: ' + String(message).slice(0, 240);
+        document.body.appendChild(toast);
+        setTimeout(function () { if (toast.parentNode) toast.remove(); }, 12000);
         setTimeout(function () {
             btn.classList.remove('is-error');
             if (wrap) wrap.classList.remove('is-error');
-            btn.title = previousTitle;
+            if (btn.title === message) btn.title = previousTitle;
         }, CONFIG.errorFlashMs);
     }
 
@@ -1425,8 +2182,7 @@
                 var entries = performance.getEntriesByType('resource');
                 for (var e = 0; e < entries.length; e++) {
                     var u = entries[e].name;
-                    if (u.indexOf('/vid/avc1/') === -1 || !/\.mp4(\?|$)/.test(u) ||
-                        u.indexOf('.m4s') !== -1 || u.indexOf('.m3u8') !== -1) continue;
+                    if (!isProgressiveVideoUrl(u)) continue;
                     for (var t = 0; t < targets.length; t++) {
                         if (!targets[t].url && u.indexOf('amplify_video/' + targets[t].id + '/vid/avc1/') !== -1) {
                             targets[t].url = u;
@@ -1463,8 +2219,64 @@
      * Poster als Bild-Notnagel. Überspringt Medien, die bereits vorhanden sind
      * (gleiche Media-ID oder URL-Basis). Idempotent.
      */
+    function performanceHlsFromTweet(tweet) {
+        if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function') return [];
+        var ids = new Set();
+        var visible = tweet.querySelectorAll('img, video');
+        for (var i = 0; i < visible.length; i++) {
+            if (visible[i].closest(CONFIG.tweetSelector) !== tweet) continue;
+            var urls = [visible[i].getAttribute('src'), visible[i].getAttribute('poster'), visible[i].currentSrc];
+            for (var j = 0; j < urls.length; j++) {
+                var id = mediaIdOf(urls[j] || '');
+                if (id) ids.add(id);
+            }
+        }
+        if (!ids.size) {
+            var activeVideos = Array.prototype.slice.call(tweet.querySelectorAll('video')).filter(function (v) {
+                return v.closest(CONFIG.tweetSelector) === tweet && !v.paused;
+            });
+            if (activeVideos.length !== 1) return [];
+            var playingAnywhere = document.querySelectorAll('video');
+            var countPlaying = 0;
+            for (var ai = 0; ai < playingAnywhere.length; ai++) if (!playingAnywhere[ai].paused) countPlaying++;
+            if (countPlaying !== 1) return [];
+            var pscpUrls = performance.getEntriesByType('resource').map(function (e) { return e.name; })
+                .filter(function (url) {
+                    try { return hlsUrl(url) && new URL(url).hostname !== 'video.twimg.com'; }
+                    catch (e) { return false; }
+                });
+            // Nie eine Playlist eines anderen Players blind zuordnen.
+            var unique = Array.from(new Set(pscpUrls));
+            return unique.length === 1 ? [{ url: unique[0], ext: 'ts', hls: true, broadcast: true }] : [];
+        }
+        var found = [], entries = performance.getEntriesByType('resource');
+        for (var k = entries.length - 1; k >= 0; k--) {
+            var url = entries[k].name, mediaId = mediaIdOf(url);
+            if (hlsUrl(url) && mediaId && ids.has(mediaId)) {
+                found.push({ url: url, ext: 'mp4', hls: true });
+                ids.delete(mediaId);
+            }
+        }
+        return found;
+    }
+
     async function mergeDomItems(tweet, items) {
         var result = items.slice();
+        var performanceItems = performanceHlsFromTweet(tweet);
+        for (var perf = 0; perf < performanceItems.length; perf++) {
+            var perfId = mediaIdOf(performanceItems[perf].url);
+            if (!result.some(function (item) { return item.url === performanceItems[perf].url ||
+                (perfId && perfId === mediaIdOf(item.url)); })) result.push(performanceItems[perf]);
+        }
+        var rendered = renderedTweetMedia(tweet, getTweetId(tweet));
+        for (var r = 0; r < rendered.length; r++) {
+            var renderedId = mediaIdOf(rendered[r].url);
+            var duplicateRendered = result.some(function (item) {
+                return item.url === rendered[r].url ||
+                    (renderedId && mediaIdOf(item.url) === renderedId);
+            });
+            if (!duplicateRendered) result.push(rendered[r]);
+        }
         var domUrls = extractDomMedia(tweet);
         var pending = [];
         var resolveIds = [];
@@ -1550,20 +2362,40 @@
      * Fall wieder frei (finally), sonst bliebe er dauerhaft gesperrt.
      */
     async function onDownloadClick(tweet, btn) {
-        if (btn.disabled) return; // Doppelklick-Guard
-        setBusy(btn, true);       // Button sofort deaktivieren
+        var active = runningDownloads.get(btn);
+        if (active) { showCancelPopup(btn, active); return; }
+        var controller = new AbortController();
+        var task = { controller: controller, signal: controller.signal, popup: null, closePopup: null };
+        runningDownloads.set(btn, task);
+        setBusy(btn, true);
 
         var tweetId = getTweetId(tweet);
         var handle = sanitizeFilenamePart(getHandle(tweet));
         var items = [];
         var apiStatus = null;
         var failed = 0;
+        var firstFailure = null;
         var errorMessage = null;
         var selectedFile = null;
         var selectedFilename = null;
 
         try {
-            var cached = getCachedItems(tweetId);
+            ensureNotCancelled(task.signal);
+            var rendered = renderedTweetMedia(tweet, tweetId);
+            var cached = rendered.length ? rendered : getCachedItems(tweetId);
+            var domBroadcast = broadcastFromDom(tweet);
+            if ((!cached || !cached.length) && domBroadcast) cached = [domBroadcast];
+            if ((!cached || !cached.length) && tweet.querySelectorAll) {
+                var ownPlayers = tweet.querySelectorAll('video, [data-testid="videoPlayer"], [data-testid="videoComponent"]');
+                for (var pv = 0; pv < ownPlayers.length; pv++) {
+                    if (ownPlayers[pv].closest(CONFIG.tweetSelector) !== tweet) continue;
+                    selectedFilename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
+                        handle: handle, id: tweetId, index: 1, ext: 'mp4'
+                    }));
+                    selectedFile = await selectDownloadFile(selectedFilename);
+                    break;
+                }
+            }
             if (cached && cached.length) {
                 log.info('Cache-Treffer für Tweet ' + tweetId + ' — sofortiger Download.');
                 items = cached;
@@ -1573,21 +2405,36 @@
                 items = live.items;
                 apiStatus = live.apiStatus;
             }
+            ensureNotCancelled(task.signal);
             // Das erste API-Medium bleibt beim DOM-Merge an erster Stelle.
             // Daher kann sein Dialog bereits vor einem ggf. 5-s-Video-Resolver
             // erscheinen. Ohne API-Medien muss erst die Endung geklärt werden.
-            if (items.length) {
+            if (items.length && !selectedFilename) {
                 selectedFilename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
                     handle: handle, id: tweetId, index: 1, ext: items[0].ext
                 }));
                 selectedFile = await selectDownloadFile(selectedFilename);
             }
+            // Bei einem Cache-Miss kann die API erst nach dem bereits geoeffneten
+            // MP4-Dialog eine TS-Broadcastquelle liefern. Niemals TS als MP4
+            // speichern; Quelle fuer den naechsten Klick kurz zwischenspeichern.
+            if (selectedFile && items.length && items[0].ext === 'ts' &&
+                selectedFilename && /\.mp4$/i.test(selectedFilename)) {
+                mediaCache.set(tweetId, { items: items, fetchedAt: Date.now() });
+                throw new Error('Broadcast-Quelle ermittelt. Erneut klicken, um .ts als Dateityp zu waehlen.');
+            }
             // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
             // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
             items = await mergeDomItems(tweet, items);
+            ensureNotCancelled(task.signal);
+            if (selectedFile && items.length && items[0].ext !== 'mp4' && selectedFilename && /\.mp4$/i.test(selectedFilename)) {
+                // No incorrect extension: the picker chose an MP4 but API found an image.
+                throw new Error('Videokarte ohne Videodatei: Dateiauswahl nicht übernommen');
+            }
 
+            ensureNotCancelled(task.signal);
             if (!items.length) {
-                errorMessage = 'Keine Medien gefunden';
+                errorMessage = 'Keine abrufbare Medienquelle gefunden (auch Broadcast geprueft)';
                 if (apiStatus === 429) {
                     errorMessage = 'Rate-Limit (429) - kurz warten, dann erneut versuchen';
                 } else if (apiStatus === 401 || apiStatus === 403) {
@@ -1596,6 +2443,7 @@
                 log.warn('Keine Medien für Tweet ' + tweetId + ' gefunden (Cache + API + DOM). API-Status: ' + apiStatus);
             } else {
                 for (var i = 0; i < items.length; i++) {
+                    ensureNotCancelled(task.signal);
                     var filename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
                         handle: handle,
                         id: tweetId,
@@ -1605,7 +2453,7 @@
                     if (i === 0 && selectedFile) filename = selectedFilename;
                     var saveAs = (saveAsMode === 'all') || (i === 0);
                     // Fortschritts-Badge nur bei Videos relevant (Bilder/kurze Videos: nein)
-                    var isVideo = (items[i].ext === 'mp4');
+                    var isVideo = (items[i].ext === 'mp4' || items[i].ext === 'ts');
                     try {
                         log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
                         var reportProgress = function (progress) {
@@ -1613,7 +2461,7 @@
                             // Bildern und kurzen Videos wird nichts angezeigt.
                             if (!progress || !isVideo) return;
                             var total = Number(progress.total);
-                            if (!isFinite(total) || total < CONFIG.progressBadgeMinBytes) return;
+                            if (!isFinite(total) || (!progress.segmented && total < CONFIG.progressBadgeMinBytes)) return;
                             // Tampermonkey liefert { done, total } (Bytes) — percent
                             // existiert dort nicht, wird aber unterstützt, falls ein
                             // anderer Manager ihn liefert. done kann fehlen oder NaN
@@ -1638,16 +2486,35 @@
                             // unverändert GM_download verwendet.
                             if (!selectedFile && !selectedFilename) selectedFile = await selectDownloadFile(filename);
                         }
-                        if (i === 0 && selectedFile) {
-                            await downloadSelectedFile(items[i].url, selectedFile, reportProgress);
+                        if (items[i].broadcastId) {
+                            var broadcastUrl = await broadcastPlaybackUrl(items[i].broadcastId);
+                            var broadcastFile = (i === 0 && selectedFile) ? selectedFile : await selectDownloadFile(filename);
+                            if (!broadcastFile) throw new Error('Broadcast: Dateiauswahl erforderlich (erneut klicken)');
+                            var manifest = await hlsResolve(broadcastUrl, task.signal);
+                            if (!manifest.transportStream) throw new Error('Broadcast: Replay ist kein MPEG-TS (MP4-Ausgabe noch nicht unterstuetzt)');
+                            await downloadHlsFile(broadcastUrl, broadcastFile, reportProgress, task.signal);
+                        } else if (hlsUrl(items[i].url)) {
+                            if (items[i].broadcast) {
+                                var broadcastManifest = await hlsResolve(items[i].url, task.signal);
+                                if (!broadcastManifest.transportStream) throw new Error('Broadcast: Playlist ist kein MPEG-TS');
+                            }
+                            // Große HLS-Dateien müssen auf die gewählte Datei gestreamt
+                            // werden; GM_download würde nur eine Text-Playlist speichern.
+                            var hlsFile = (i === 0 && selectedFile) ? selectedFile : await selectDownloadFile(filename);
+                            if (!hlsFile) throw new Error('HLS benötigt eine Browser-Dateiauswahl (Chrome/Edge/Yandex)');
+                            await downloadHlsFile(items[i].url, hlsFile, reportProgress, task.signal);
+                        } else if (i === 0 && selectedFile) {
+                            await downloadSelectedFile(items[i].url, selectedFile, reportProgress, task.signal);
                         } else {
-                            await downloadUrl(items[i].url, filename, saveAs, reportProgress);
+                            await downloadUrl(items[i].url, filename, saveAs, reportProgress, task.signal);
                         }
+                        ensureNotCancelled(task.signal);
                         log.info('Gespeichert: ' + filename);
                     } catch (err) {
-                        if (err.name === 'AbortError') return;
+                        if (isCancellation(err, task.signal)) return;
                         failed++;
-                        log.error('Download fehlgeschlagen (' + items[i].url + '): ' + err.message);
+                        if (!firstFailure) firstFailure = (err && err.message) || 'unbekannter Fehler';
+                        log.error('Download fehlgeschlagen: ' + ((err && err.message) || 'unbekannter Fehler'));
                     }
                 }
 
@@ -1659,14 +2526,16 @@
                 prefetchSeen.delete(tweetId);
 
                 if (failed > 0) {
-                    errorMessage = failed + ' von ' + items.length + ' fehlgeschlagen';
+                    errorMessage = failed + ' von ' + items.length + ' fehlgeschlagen: ' + firstFailure;
                 }
             }
         } catch (err) {
-            if (err.name === 'AbortError') return;
-            errorMessage = 'Fehler beim Laden';
+            if (isCancellation(err, task.signal)) return;
+            errorMessage = 'Fehler beim Laden: ' + ((err && err.message) || 'unbekannter Fehler');
             log.error('Download-Ablauf fehlgeschlagen (Tweet ' + tweetId + '): ' + (err && err.message ? err.message : err));
         } finally {
+            closeCancelPopup(task);
+            runningDownloads.delete(btn);
             hideProgress(btn);
             setBusy(btn, false);
         }
@@ -1873,7 +2742,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.26 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.33 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

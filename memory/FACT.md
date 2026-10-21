@@ -1,4 +1,4 @@
-# xLoader — FACT SHEET (Stand: v1.0.26, 2026-10-21, Release verifiziert)
+# xLoader — FACT SHEET (Stand: v1.0.33, 2026-10-21)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
@@ -7,7 +7,7 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.26`). Dialogoptimierung aus der Nutzer-Testfassung, anschließend ausdrücklich beauftragter Streamingfix: Status 0 zulassen, keinen Fetch-timeout:0, onloadend anfordern, HTTP-Abschluss vor Dateiübernahme prüfen.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.33`). Dialogoptimierung aus der Nutzer-Testfassung, anschließend ausdrücklich beauftragter Streamingfix: Status 0 zulassen, keinen Fetch-timeout:0, onloadend anfordern, HTTP-Abschluss vor Dateiübernahme prüfen.
 - **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -17,7 +17,10 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
 - **Veröffentlichter Ausgangsstand:** v1.0.24, Commit `e16a6cf`. v1.0.26 ist veröffentlicht und auf GitHub sowie Greasy Fork verifiziert (Release-Commit `d5dd2d374ba8303479a385c6b43ded2bfcebb7bf`); aktueller Einstieg `HANDOVER_v1.0.26.md`. v1.0.25 wird nicht nachträglich veröffentlicht.
 
-## Aktueller Stand (v1.0.26)
+## Aktueller Stand (v1.0.33)
+
+- **v1.0.33, 2026-10-21:** Nutzerbestätigter Browser-Praxistest von v1.0.33-dev: HLS-/Broadcast-Download und Abbruchbestätigung beim erneuten Klick, Fortschrittsanzeige beibehalten. Offizielle Fassung v1.0.33: nur Release-Metadaten/-Beschreibungen (Name, Namespace, Versionsangabe, Auto-Update-URLs, Init-Log), Downloadlogik unverändert. Unterstützte Player-Cards, HLS/fMP4, Broadcast-/TS-Streams, `@connect pscp.tv` und Browser-Netzwerk-Fallback; nicht alle geschützten Streams. GitHub-Quellcode per Commit veröffentlicht; GF-Auto-Sync per Push ausgelöst. GitHub-Release-Tag und Asset gesondert prüfen.
+
 
 - **v1.0.26, 2026-10-21:** Auf Nutzeranweisung jedes neue Build mit höherer Patchversion ausgeben. Metablock, Changelog, Init-Log und README angepasst, Downloadlogik unverändert. Lokales Build Ausgabe/xLoader-v1.0.26.user.js, SHA-256 E673B1F25F022598A6F114EB46001D953DB6C7956D431E5795F4BC0FF95FD808. Alte Archive erhalten. GitHub-Asset und Raw-Quellen byte-identisch; GF automatisch synchronisiert, nur GF-Update-/Download-URLs abweichend. Nutzer bestätigt schnelle native Windows-Dateiauswahl und beide gespeicherten Videos; Veröffentlichung der unveränderten Bytes ausdrücklich freigegeben. Regel für neue Builds verbindlich in AGENTS.md; bestehende freigegebene Version bei reiner Veröffentlichung nicht erneut erhöhen.
 
@@ -31,7 +34,7 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 
 ## Metablock & Greasy-Fork-Format (WICHTIG)
 
-- **`@match`:** `https://x.com/*` und `https://twitter.com/*`; **Grants:** `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; **`@connect`:** `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`; **`@noframes`, `@run-at document-end`, `@license MIT`.**
+- **`@match`:** `https://x.com/*` und `https://twitter.com/*`; **Grants:** `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; **`@connect`:** `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; **`@noframes`, `@run-at document-end`, `@license MIT`.**
 - **`@description`-Format (seit v1.0.23):** **lokalisiert** — `@description` = deutsche Kurzbeschreibung (Default; entspricht der GF-Skript-Locale `de` von xLoader) + `@description:en` + `@description:ru` (je eigene Zeile). Damit ist das Skript in der GF-Suche unter DE/EN/RU auffindbar. **Kein** `@description:de` (wird bei Skript-Locale `de` von GF ignoriert), keine `@name:xx`-Zeilen ohne passendes `@description:xx` (GF-Validierung), keine einzeiligen DE/EN/RU-Mischtexte (v1.0.20–22: machten das Skript nur in EINER Sprache auffindbar). Vor v1.0.20: v1.0.19 = EN + `@description:de` + `@description:ru` (GF-i18n), davor zweisprachig.
 - **`description.md`** (Repo-Root): Quelle für Greasy Fork „Zusätzliche Informationen“ — DE → RU → EN, jeweils ein Absatz, KEINE Flaggen-Überschriften; im GF-Admin als zusätzliche Sync-Quelle hinterlegt (Format **markdown**).
 - **GF-Admin-Falle:** es gibt ZWEI Sync-Felder mit gleichem Platzhalter „(Internetadresse)“: `script[sync_identifier]` = Skript-URL (`…/xLoader.user.js`) vs. `additional_info_sync[0][sync_identifier]` = Beschreibungsdatei (`…/description.md`). Nicht verwechseln — falsches Feld synchronisiert das Skript aus der Beschreibungsdatei.
