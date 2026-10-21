@@ -50,3 +50,18 @@ außerhalb des Release-Commits. Keine Ausgabe-/Profil-/Temporärdaten oder
 .reasonix-Dateien committen. Autor immerzu, main. Gültige Windows-gh-Anmeldung
 wird ggf. von ungültigem GH_TOKEN überlagert: nur im Kindprozess GH_TOKEN und
 GITHUB_TOKEN entfernen, keine globale Authentifizierung ändern.
+
+## Verifizierter Abschluss
+
+- Release-Commit und Tag v1.0.26: d5dd2d374ba8303479a385c6b43ded2bfcebb7bf.
+- GitHub-Release veröffentlicht (kein Draft/Prerelease); Asset erneut
+  heruntergeladen: 88.142 Bytes, SHA-256 E673B1F25F022598A6F114EB46001D953DB6C7956D431E5795F4BC0FF95FD808.
+- GitHub Raw für Tag und main byte-identisch mit der freigegebenen Quelle.
+- GF-Seite und Rohdatei zeigen 1.0.26. Automatischer Webhook-Sync genügte;
+  kein manueller Trigger. Rohdatei 88.118 Bytes, SHA-256 ECAD442C559554D12505009D55E0DC4FDDF3D8E7951D25ECF2844FC140C5D51E.
+  Nach Entfernen ausschließlich der beiden GF-eigenen Update-/Download-URL-
+  Zeilen ist der gesamte Inhalt exakt identisch, einschließlich Reihenfolge.
+- Alle 71 Tests und Syntax erfolgreich. Vorbestehende .gitignore und
+  HANDOVER_v1.0.24.md gegen Sicherung bytegleich; keine Browseraktionen.
+- Ein nachfolgender reiner Doku-Commit protokolliert diese Abschlussnachweise;
+  Tag/Release-Commit und Userscript bleiben unverändert.
