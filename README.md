@@ -76,11 +76,13 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.26** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.33** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+
+- **v1.0.33** — supported HLS/Player-Card/broadcast recordings, MPEG-TS output, progress and confirmed cancellation on a second click.
 
 - **v1.0.26** — save dialog before media transfer; correct streaming startup, timeout handling and completion prevent empty first video files. The user confirmed the fast dialog and both saved videos on Windows.
 
-- **v1.0.25 (local only / nur lokal / только локально)** — first file picker before DOM/video merge and media transfer; streaming write with progress, stall watchdog and error cleanup. Existing filenames, multi-media options and `GM_download` fallback remain. The user confirmed the faster dialog in their browser; no automated native dialog timing is claimed.
+- **v1.0.25 (local only)** — first file picker before DOM/video merge and media transfer; streaming write with progress, stall watchdog and error cleanup. Existing filenames, multi-media options and `GM_download` fallback remain. The user confirmed the faster dialog in their browser; no automated native dialog timing is claimed.
 
 - **v1.0.24** — download fixes: quoted-tweet handle, recheck without action bar, local API status, shared video resolver, single DOM merge; robust error handling and a 5-minute stall watchdog; clearer `GM_download` errors. Tested: 13/13 fix, 11/11 DOM, 19/19 watchdog tests; portable Chrome and Yandex (Browser API).
 
@@ -101,11 +103,13 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.26** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste Version: **v1.0.33** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.33** — unterstützte HLS-/Player-Card-/Broadcast-Aufzeichnungen, MPEG-TS-Ausgabe, Fortschritt und bestätigter Abbruch per erneutem Klick.
 
 - **v1.0.26** — Dateiauswahl vor dem Datentransfer; korrigierter Streamstart, Timeout und Abschluss verhindern leere erste Videodateien. Der Nutzer bestätigt unter Windows den schnellen Dialog und beide gespeicherten Videos.
 
-- **v1.0.25** — erste Dateiauswahl vor DOM-/Video-Merge und Datentransfer; Streaming mit Fortschritt, Stillstands-Watchdog und Fehlerbereinigung. Dateinamen, Mehrfachmedienoptionen und `GM_download`-Fallback bleiben erhalten. Der Nutzer hat den schnellen Dialog im Browser bestätigt; keine automatisch gemessenen nativen Dialogzeiten.
+- **v1.0.25 (nur lokal)** — erste Dateiauswahl vor DOM-/Video-Merge und Datentransfer; Streaming mit Fortschritt, Stillstands-Watchdog und Fehlerbereinigung. Dateinamen, Mehrfachmedienoptionen und `GM_download`-Fallback bleiben erhalten. Der Nutzer hat den schnellen Dialog im Browser bestätigt; keine automatisch gemessenen nativen Dialogzeiten.
 
 - **v1.0.24** — Download-Fixes: quoted-Tweet-Handle, Recheck ohne Aktionsleiste, lokaler API-Status, gemeinsamer Video-Resolver, einmaliger DOM-Merge; robuste Fehlerbehandlung und 5-Minuten-Stillstands-Watchdog; klarere `GM_download`-Fehler. Getestet: 13/13 Fix-, 11/11 DOM-, 19/19 Watchdog-Tests; portabler Chrome und Yandex (Browser-API).
 
@@ -126,11 +130,13 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.26** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.33** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+
+- **v1.0.33** — поддерживаемые HLS/Player Card/трансляции, вывод MPEG-TS, прогресс и подтверждение отмены при повторном нажатии.
 
 - **v1.0.26** — выбор файла до передачи данных; исправлены запуск потока, таймаут и завершение загрузки первого видео. Пользователь подтвердил быстрый диалог и сохранение обоих видео в Windows.
 
-- **v1.0.25** — первый выбор файла до DOM/video-merge и передачи данных; потоковая запись с прогрессом, watchdog и обработкой ошибок. Сохранены имена файлов, режимы нескольких медиа и запасной `GM_download`. Пользователь подтвердил быстрый диалог в браузере; автоматический замер нативного диалога не проводился.
+- **v1.0.25 (только локально)** — первый выбор файла до DOM/video-merge и передачи данных; потоковая запись с прогрессом, watchdog и обработкой ошибок. Сохранены имена файлов, режимы нескольких медиа и запасной `GM_download`. Пользователь подтвердил быстрый диалог в браузере; автоматический замер нативного диалога не проводился.
 
 - **v1.0.24** — исправления загрузки: handle для quoted-твитов, повторная проверка без панели действий, локальный статус API, общий видео-резолвер, однократный DOM-merge; надёжная обработка ошибок и 5-минутный watchdog; понятные ошибки `GM_download`. Проверено: 13/13 fix, 11/11 DOM, 19/19 watchdog; портативный Chrome и Yandex (Browser API).
 
@@ -151,19 +157,34 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## Development / Entwicklung / Разработка
 
-**English 🇬🇧:** The repository contains a single source file — `xLoader.user.js` (userscript; the metadata block and the full changelog are at the top). The `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` files are local version archives from older releases (underscore naming, repo root); new archives go to `Ausgabe/xLoader-v1.0.X.js` (since v1.0.24: `xLoader-v1.0.X.user.js`; hyphen + current `@version`). They are intentionally never committed (`Ausgabe/` is gitignored). `description.md` is the source for the Greasy Fork "Additional info" section (DE → RU → EN). Syntax check: `node --check xLoader.user.js`. Optional DOM regression test (lives outside this repo, local only): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release flow: bump `@version` + changelog comment + init log line in the script → `node --check` → commit & push to `main` → Greasy Fork updates automatically via webhook → optional GitHub tag + release (`gh release create`).
+Current source / aktuelle Quelle: **v1.0.33**, identical to the approved GitHub source. Earlier v1.0.28 is preserved only as a local historical archive. See [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
 
-**Deutsch 🇩🇪:** Das Repository enthält genau eine Quelldatei — `xLoader.user.js` (Userscript; Metablock und vollständiger Changelog stehen oben). Die Dateien `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` sind lokale Versionsarchive aus früheren Releases (Unterstrich-Benennung, Repo-Root); neue Archive kommen nach `Ausgabe/xLoader-v1.0.X.js` (seit v1.0.24: `xLoader-v1.0.X.user.js`; Bindestrich + aktuelle `@version`). Sie werden bewusst nie committet (`Ausgabe/` ist gitignored). `description.md` ist die Quelle für den Abschnitt „Zusätzliche Informationen“ auf Greasy Fork (DE → RU → EN). Syntax-Check: `node --check xLoader.user.js`. Optionaler DOM-Regressionstest (außerhalb dieses Repos, nur lokal): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Release-Ablauf: `@version` + Changelog-Kommentar + Init-Log-Zeile im Skript anheben → `node --check` → Commit & Push auf `main` → Greasy Fork aktualisiert per Webhook automatisch → optional GitHub-Tag + Release (`gh release create`).
+**English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins (checked with Node.js 22.23.2). Run the syntax check below from the project root. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
-**Русский 🇷🇺:** В репозитории один исходный файл — `xLoader.user.js` (юзерскрипт; метаблок и полный журнал изменений в начале). Файлы `xLoader_v1.0.X.js` / `Downloadhilfe_v1.0.X.js` — локальные архивы версий из более ранних релизов (именование с подчёркиванием, корень репозитория); новые архивы сохраняются в `Ausgabe/xLoader-v1.0.X.js` (с v1.0.24: `xLoader-v1.0.X.user.js`; дефис + актуальная `@version`). Они намеренно никогда не коммитятся (`Ausgabe/` в .gitignore). `description.md` — источник раздела «Дополнительная информация» на Greasy Fork (DE → RU → EN). Проверка синтаксиса: `node --check xLoader.user.js`. Необязательный DOM-регресс-тест (вне этого репозитория, только локально): `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js`. Порядок релиза: поднять `@version` + комментарий журнала + строку лога инициализации в скрипте → `node --check` → commit и push в `main` → Greasy Fork обновляется автоматически через webhook → опционально тег GitHub + релиз (`gh release create`).
+**Deutsch 🇩🇪:** Arbeitsdatei ist [xLoader.user.js](xLoader.user.js); der Kommentar am Anfang enthält den maßgeblichen Changelog. Kein Kompilieren oder Installieren von npm-Abhängigkeiten nötig. Tests verwenden Node.js-Bordmittel (geprüft mit Node.js 22.23.2). Die folgende Syntaxprüfung im Projektstamm ausführen. Versionsarchive und Prüfnachweise gehören nach `Ausgabe/` (ignoriert). Release-Schritte benötigen ausdrückliche Freigabe; Ablauf in [FACT.md](memory/FACT.md).
 
-## Release checks / Release-Prüfung
+**Русский 🇷🇺:** Исходник — [xLoader.user.js](xLoader.user.js); основной журнал изменений находится в начальном комментарии. Компиляция и установка npm-зависимостей не нужны. Тесты используют встроенные модули Node.js (проверено с Node.js 22.23.2). Проверка синтаксиса ниже выполняется из корня проекта. Архивы и результаты проверок хранятся в игнорируемом `Ausgabe/`. Публикация требует явного разрешения; порядок — в [FACT.md](memory/FACT.md).
 
-Run `node --check xLoader.user.js`, `node tests/dom-media.test.cjs`, `node tests/fixes.test.cjs`, `node tests/watchdog.test.cjs` and `node --test tests/download-flow.test.cjs`. The 43 regression checks plus 28 download tests cover completion, byte integrity, cancellation, errors, first/all and the fallback without touching browser profiles. The HTTP/disk test uses a local server; picker and Tampermonkey callbacks are test doubles. Both videos of the reported two-video tweet were additionally transferred using real Tampermonkey 5.5.1, with matching byte counts and independently checked SHA-256 values (file adapter). Stream startup accepts status 0, avoids the immediate fetch timeout, and requests the completion signal. Browser APIs and sandbox support vary; native dialog behavior is user-confirmed, not timed by these tests.
+```powershell
+node --check xLoader.user.js
+```
+
+Historical test scaffolds: 83 checks last passed against local v1.0.28; they are retained as local work and are not a new v1.0.33 acceptance result. For this unchanged v1.0.33 release, syntax and source/asset integrity are checked. HLS download and cancellation were confirmed by the user; see [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md). Native dialog timing is not newly measured.
+
+| Path / Pfad / Путь | Purpose / Zweck / Назначение |
+|---|---|
+| [xLoader.user.js](xLoader.user.js) | Source, metadata and full changelog / Quelle, Metadaten und Changelog |
+| [tests/](tests/) | Local regression tests / lokale Regressionstests |
+| [description.md](description.md) | Greasy Fork additional-info sync source, DE → RU → EN |
+| [memory/MEMORY.md](memory/MEMORY.md) | Current instructions and historical handovers / Projektgedächtnis |
+| [ru-board_xloader_post.md](ru-board_xloader_post.md) | Historical forum draft, v1.0.24; review before reuse / historischer Entwurf |
+| `Ausgabe/` | Ignored version archives, backups and evidence; not part of a fresh clone |
+
+Local cleanup candidates and retained artifacts: [CLEANUP_2026-10-21.md](memory/CLEANUP_2026-10-21.md). Historical handovers retain the facts from their respective dates; the current starting point is the memory index.
 
 ## License / Lizenz / Лицензия
 
