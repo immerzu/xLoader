@@ -1,13 +1,13 @@
-# xLoader — FACT SHEET (Arbeitsstand: v1.0.39-dev, Release: v1.0.33, 2026-10-23)
+# xLoader — FACT SHEET (Arbeitsstand und Release: v1.0.39, 2026-10-23)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.39-dev dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.39 dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, lokal `@version 1.0.39-dev`). Enthält Härtung, Quoted-Video-Fix sowie gehärteten Videofortschritt nach Timeline-DOM-Recycling.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, lokal `@version 1.0.39`). Enthält Härtung, Quoted-Video-Fix sowie gehärteten Videofortschritt nach Timeline-DOM-Recycling.
 - **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -15,18 +15,18 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Auto-Update im Skript:** `@updateURL`/`@downloadURL` = raw GitHub `main`.
 - **Install-Link:** `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js` (Tampermonkey bietet Installation an).
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
-- **Verifizierter Release-Stand:** v1.0.33, Commit `204d9d64d0070cc75b6bfa75473abda0f81eda29`, Blob `c30c868bcd10baa27c98d1bdc602a1bb961c4fd0`. Aktueller Einstieg: `HANDOVER_v1.0.33.md`. v1.0.25/v1.0.28 bleiben historische lokale Fassungen.
+- **Verifizierter Release-Stand:** v1.0.39, Commit und Tagziel `bbd2dc7ed46399920f89b4a36977815e22bd13ba`. GitHub-Asset 166.367 Bytes, SHA-256 `A5A78F917F1EE701CDD2152D0F8A87F6D546C5E40A6798C67A3955DFEA27EA39`; Greasy-Fork-Rohfassung 166.343 Bytes, SHA-256 `16BFAF0ACB946379EC90BD11E0E2DFB884786079F52F652DE3433EFF8708159C`, nach Entfernung der GF-eigenen Update-URL-Zeilen inhaltlich identisch. Aktueller Einstieg: `HANDOVER_v1.0.39.md`.
 
-## Aktueller Arbeitsstand (v1.0.39-dev; nicht veröffentlicht)
+## Aktueller Arbeits- und Release-Stand (v1.0.39)
 
-- **v1.0.39-dev, 2026-10-23:** DOM-Wiederanbindung gehärtet: Ein von X für einen anderen Tweet recycelter Button wird vom alten Task getrennt; entfernte Buttons werden aus WeakMap und Taskliste bereinigt; mehrere verbundene Darstellungen desselben Tweets erhalten synchron denselben Fortschritt. Syntax und 75 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.39-dev.md`.
+- **v1.0.39, 2026-10-23:** Downloadintegrität, HLS, Abbruch, Medienauswahl und DOM-Wiederanbindung gehärtet. Ein von X für einen anderen Tweet recycelter Button wird vom alten Task getrennt; entfernte Buttons werden bereinigt; mehrere Darstellungen erhalten synchron denselben Fortschritt. Syntax und 75 lokale Subtests erfolgreich. Nutzer bestätigte Fortschrittsanzeige sowie vollständige Mehrfachmedien-Downloads unter Windows/Tampermonkey. GitHub und Greasy Fork veröffentlicht und inhaltlich geprüft. Details: `HANDOVER_v1.0.39.md`.
 - **v1.0.38-dev, 2026-10-23:** Bereits vorhandene xLoader-Buttons werden nach DOM-Änderungen wieder an laufende Tweet-Tasks gebunden. Der Observer berücksichtigt auch reine Entfernungen innerhalb eines Tweets, sodass ein von X entferntes Badge wiederhergestellt wird. Syntax und 73 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.38-dev.md`.
 - **v1.0.37-dev, 2026-10-23:** Laufende Downloads werden zusätzlich nach Tweet-ID geführt. Neu gerenderte Buttons übernehmen Fortschritt, Busy- und Abbruchzustand; Abschluss bereinigt alle Bindungen. Syntax und 73 lokale Subtests erfolgreich; echter Scrolltest mit Tampermonkey noch offen. Details: `HANDOVER_v1.0.37-dev.md`.
 - **v1.0.36-dev, 2026-10-23:** Videotransfers zeigen sofort eine neutrale laufende Anzeige; bei brauchbarer Gesamtgröße ab 5 MiB wechselt sie auf Prozent. Damit bleibt der GM_download-Fallback auch sichtbar, wenn Browser/Tampermonkey keine Fortschrittswerte liefern. Syntax und 72 lokale Subtests erfolgreich; echter Tampermonkey-Test noch offen. Details: `HANDOVER_v1.0.36-dev.md`.
 - **v1.0.35-dev, 2026-10-23:** Verschachtelte `quoted_tweet`-/GraphQL-Medien und Syndication-`mediaDetails` werden ausgewertet. Vollständige Videodaten haben Vorrang vor unvollständigem `entities.media`; ungelöste Video-Poster werden nicht mehr als JPG gespeichert. Referenz-Tweet mit aktueller Live-Metadatenform, vollständiger 22.847.955-Byte-MP4 und lokaler Gesamtsuite geprüft; echter Tampermonkey-Test der neuen Fassung noch offen. Details: `HANDOVER_v1.0.35-dev.md`.
 - **v1.0.34-dev, 2026-10-22:** H1–H7 aus `HARDENING_2026-10-22.md` behoben: vollständige HTTP-Antwort und Mediensignatur, strengere fMP4-/TS-Prüfung, eindeutige Ablehnung von MAP-Wechsel/GAP/Discontinuity, Container-/Endungsabgleich, AbortSignal für Metadaten und Transfers, zentrale HTTPS-/Host-/Pfadprüfung sowie Größen-, Cache-, Queue- und Generationsgrenzen. Zusätzliche Fälle für HLS-Folgeauswahl, Abbruch beim Schreiben, Windows-Dateinamen und veraltete Broadcast-Performance-Einträge geprüft. Syntax und vollständige lokale Suite erfolgreich; kein Browserlauf, keine Veröffentlichung. Details: `HANDOVER_v1.0.34-dev.md`.
 
-## Veröffentlichter Stand (v1.0.33)
+## Veröffentlichte Stände
 
 - **v1.0.33, 2026-10-21:** Nutzerbestätigter Browser-Praxistest von v1.0.33-dev: HLS-/Broadcast-Download und Abbruchbestätigung beim erneuten Klick, Fortschrittsanzeige beibehalten. Offizielle Fassung v1.0.33: nur Release-Metadaten/-Beschreibungen (Name, Namespace, Versionsangabe, Auto-Update-URLs, Init-Log), Downloadlogik unverändert. Unterstützte Player-Cards, HLS/fMP4, Broadcast-/TS-Streams, `@connect pscp.tv` und Browser-Netzwerk-Fallback; nicht alle geschützten Streams. Tag v1.0.33 und GitHub-Asset erstellt und erneut geprüft; GF-Seite/Rohdatei 1.0.33, Inhalt bis auf Update-URLs identisch. Nachweise in HANDOVER_v1.0.33.md.
 
@@ -60,7 +60,7 @@ gelten nur für die jeweilige alte Version.
 
 Historischer Funktionskatalog und alte Datenflüsse:
 [HANDOVER v1.0.23 §5](HANDOVER_v1.0.23.md#5-funktionskatalog-zeilen--v1023).
-Aktueller lokaler Prüfstand: [HANDOVER v1.0.39-dev](HANDOVER_v1.0.39-dev.md). Release-Nachweise: [HANDOVER v1.0.33](HANDOVER_v1.0.33.md). Frühere Tests bleiben in ihren historischen Handovers eingeordnet.
+Aktueller Prüf- und Release-Stand: [HANDOVER v1.0.39](HANDOVER_v1.0.39.md). Frühere Release-Nachweise: [HANDOVER v1.0.33](HANDOVER_v1.0.33.md). Frühere Tests bleiben in ihren historischen Handovers eingeordnet.
 Keine zweite veraltete Zeilentabelle hier fortschreiben.
 
 ## Kernabläufe
@@ -106,7 +106,7 @@ Der maßgebliche Changelog steht im Kommentar am Anfang von `xLoader.user.js`.
 Die dreisprachige Übersicht steht in [README.md](../README.md#version-history--versionshistorie--история-версий).
 Historische Zustände bleiben in den versionsbezogenen Handovers und im Journal
 erhalten. v1.0.25 war nur lokal; veröffentlichter Nachfolger von v1.0.24 ist
-v1.0.26; veröffentlichter Quellstand v1.0.33, lokaler Arbeitsstand v1.0.39-dev. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
+v1.0.26; aktueller veröffentlichter Quell- und Arbeitsstand ist v1.0.39. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
 
 ## Build- & Release-Regeln (verbindlich)
 
@@ -150,7 +150,7 @@ dokumentiert; der reguläre Ablauf benötigt keine Skriptinstallation im Browser
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.39-dev; Metablock + Changelog oben |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.39; Metablock + Changelog oben |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.user.js`, ältere `.js` (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |
@@ -175,4 +175,6 @@ unverändert; keine neue Dialogzeitmessung. Details: [HANDOVER v1.0.28](HANDOVER
 
 Analyse des v1.0.33-Quellstands und Umsetzung in v1.0.34-dev:
 [Befunde, Korrekturen und Nachweisgrenzen](HARDENING_2026-10-22.md).
-Die Härtung ist lokal getestet, aber noch nicht im Browser/Tampermonkey abgenommen oder veröffentlicht.
+Die Härtung ist lokal durch 75 Tests geprüft. Der Nutzer bestätigte die aktuelle
+Gesamtfassung im Windows-/Tampermonkey-Betrieb für Fortschritt und vollständige
+Mehrfachmedien-Downloads; GitHub und Greasy Fork liefern v1.0.39.

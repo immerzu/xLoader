@@ -31,11 +31,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 2. Установите скрипт: откройте [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey предложит установку. (Альтернатива: склонируйте репозиторий и импортируйте файл через панель Tampermonkey.)
 3. Откройте [x.com](https://x.com) — под каждым твитом с медиа появится кнопка загрузки в панели действий.
 
-## What's new in v1.0.33 / Neu in v1.0.33 / Новое в v1.0.33
+## What's new in v1.0.39 / Neu in v1.0.39 / Новое в v1.0.39
 
-- **EN:** Supports selected X Player-Card, HLS/fMP4 and broadcast recordings; MPEG-TS content may be saved as `.ts`. Click the download button again during transfer to choose Yes (cancel) or No (continue). Not every protected or streaming format is supported.
-- **DE:** Unterstützt bestimmte X-Player-Cards, HLS-/fMP4- und Broadcast-Aufzeichnungen; MPEG-TS wird gegebenenfalls als `.ts` gespeichert. Bei laufendem Download erneut klicken: Ja (abbrechen) oder Nein (fortsetzen). Nicht alle Streaming-/geschützten Formate werden unterstützt.
-- **RU:** Поддерживаются некоторые X Player Card, записи HLS/fMP4 и трансляций; MPEG-TS может сохраняться как `.ts`. Повторное нажатие во время загрузки: Да (отменить) или Нет (продолжить). Поддерживаются не все форматы потокового видео.
+- **EN:** Hardens media integrity, cancellation, URL validation and HLS processing; fixes nested/quoted media, preserves complete multi-media downloads and keeps progress visible while X recycles timeline DOM nodes.
+- **DE:** Härtet Medienintegrität, Abbruch, URL-Prüfung und HLS-Verarbeitung; korrigiert verschachtelte/zitierte Medien, erhält vollständige Mehrfachdownloads und hält den Fortschritt beim Timeline-DOM-Recycling sichtbar.
+- **RU:** Усилены проверки целостности медиа, отмена, URL и обработка HLS; исправлены вложенные/цитируемые медиа, полная загрузка нескольких файлов и сохранение прогресса при переработке DOM ленты X.
 
 ## Features / Funktionen / Возможности
 
@@ -76,7 +76,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.33** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.39** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+
+- **v1.0.39** — hardened media/HLS integrity and cancellation, fixed nested/quoted media, complete multi-media downloads, and persistent progress across timeline DOM recycling.
 
 - **v1.0.33** — supported HLS/Player-Card/broadcast recordings, MPEG-TS output, progress and confirmed cancellation on a second click.
 
@@ -103,9 +105,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.33**; aktueller lokaler Prüfstand: **v1.0.39-dev** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.39** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
 
-- **v1.0.39-dev (nur lokal)** — gehärtete Wiederanbindung der Fortschrittsanzeige nach Timeline-DOM-Recycling: recycelte Buttons übernehmen keine fremden Tweet-Tasks, entfernte Buttons werden aus laufenden Tasks bereinigt und mehrere sichtbare Darstellungen desselben Tweets erhalten denselben Fortschritt.
+- **v1.0.39** — Medien-/HLS-Integrität und Abbruch gehärtet, verschachtelte/zitierte Medien korrigiert, vollständige Mehrfachdownloads sowie dauerhafte Fortschrittsanzeige beim Timeline-DOM-Recycling.
 
 - **v1.0.33** — unterstützte HLS-/Player-Card-/Broadcast-Aufzeichnungen, MPEG-TS-Ausgabe, Fortschritt und bestätigter Abbruch per erneutem Klick.
 
@@ -132,7 +134,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.33** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.39** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+
+- **v1.0.39** — усилена целостность медиа/HLS и отмена, исправлены вложенные/цитируемые медиа, полная загрузка нескольких файлов и сохранение прогресса при переработке DOM.
 
 - **v1.0.33** — поддерживаемые HLS/Player Card/трансляции, вывод MPEG-TS, прогресс и подтверждение отмены при повторном нажатии.
 
@@ -159,11 +163,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33, v1.0.39 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## Development / Entwicklung / Разработка
 
-Published source / veröffentlichte Quelle: **v1.0.33**. The local working source is the unpublished **v1.0.39-dev** test build: it retains the previous hardening and media fixes, restores a running download's progress after timeline DOM recycling, rejects cross-tweet button reuse, prunes detached bindings and mirrors progress across visible representations; see [HANDOVER v1.0.39-dev](memory/HANDOVER_v1.0.39-dev.md). Earlier test builds remain historical local archives.
+Published source / veröffentlichte Quelle: **v1.0.39**. It retains the previous media support, hardens download integrity and cancellation, restores progress after timeline DOM recycling, rejects cross-tweet button reuse, prunes detached bindings and mirrors progress across visible representations; see [HANDOVER v1.0.39](memory/HANDOVER_v1.0.39.md). Earlier test builds remain historical local archives.
 
 **English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins (checked with Node.js 22.23.2). Run the syntax check below from the project root. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
@@ -175,7 +179,7 @@ Published source / veröffentlichte Quelle: **v1.0.33**. The local working sourc
 node --check xLoader.user.js
 ```
 
-The v1.0.34-dev hardening and later local fixes remain documented in their handovers. The current v1.0.39-dev DOM-rebinding hardening is locally tested until installed and verified by scrolling away from and back to a running download in Tampermonkey. The published v1.0.33 browser confirmation remains documented in [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
+The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.39 passed 75 local tests and was user-verified under Windows/Tampermonkey for progress and complete multi-media downloads. Publication evidence is recorded in [HANDOVER v1.0.39](memory/HANDOVER_v1.0.39.md); earlier v1.0.33 evidence remains in [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
 
 | Path / Pfad / Путь | Purpose / Zweck / Назначение |
 |---|---|
