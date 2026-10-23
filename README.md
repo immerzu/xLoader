@@ -42,7 +42,7 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 **English 🇬🇧**
 - **Images, videos and GIFs** — one button per tweet; the **"Save as" dialog appears for the first medium** by default (configurable: all media via the Tampermonkey menu).
 - **Choose first, download afterwards:** supported Chromium browsers open the first file picker before streaming the media to disk. Prefetch reduces metadata lookup time. Without File System Access or an active user gesture, the existing `GM_download` path is used. Subsequent media retain the first/all save modes.
-- **Reliable URL extraction:** X.com renders videos/GIFs only as posters — xLoader combines the X API (`conversation.json`, live-token retry on auth errors) with the visible DOM media (posters, article-card images `card_img`) and resolves real MP4 URLs via the playback performance buffer.
+- **Media resolution:** combines cached/rendered tweet metadata, the X API, visible media and progressive/HLS/broadcast candidates. Only supported recording formats are assembled; manifests and initialization segments are not standalone videos.
 - **Filenames:** default `@{handle}_{id}_{index}.{ext}` (e.g. `@elonmusk_123456789_1.mp4`) — configurable via the Tampermonkey menu: placeholders `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Layout:** the button is cloned from an existing X.com action-bar button, so it adapts perfectly (desktop and mobile).
 - **Tampermonkey menu:** toggle "Save as" mode (first medium only / all media), change the filename template and clear the media cache.
@@ -51,7 +51,7 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 **Deutsch 🇩🇪**
 - **Bilder, Videos und GIFs** — ein Button pro Tweet; der **„Speichern unter“-Dialog erscheint standardmäßig nur für das erste Medium** (umschaltbar über das Tampermonkey-Menü).
 - **Erst auswählen, dann herunterladen:** unterstützte Chromium-Browser öffnen die erste Dateiauswahl vor dem Streaming auf die Festplatte. Prefetch verkürzt die Metadatensuche. Ohne File System Access oder aktive Benutzeraktion greift der bisherige `GM_download`-Pfad. Weitere Medien behalten die Speicheroptionen first/all.
-- **Zuverlässige URL-Extraktion:** X.com rendert Videos/GIFs nur als Poster — xLoader kombiniert die X-API (`conversation.json`, Live-Token-Retry bei Auth-Fehlern) mit den sichtbaren DOM-Medien (Poster, Artikel-Card-Bilder `card_img`) und löst echte MP4-URLs über den Wiedergabe-Performance-Buffer auf.
+- **Medienauflösung:** kombiniert Cache/gerenderte Tweet-Metadaten, X-API, sichtbare Medien und progressive/HLS-/Broadcast-Kandidaten. Nur unterstützte Aufzeichnungen werden zusammengesetzt; Manifeste und Initialisierungssegmente sind keine eigenständigen Videos.
 - **Dateinamen:** Standard `@{handle}_{id}_{index}.{ext}` (z. B. `@elonmusk_123456789_1.mp4`) — konfigurierbar über das Tampermonkey-Menü: Platzhalter `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Layout:** Der Button wird aus einem vorhandenen X.com-Aktionsleisten-Button geklont und passt sich damit exakt an (Desktop und mobil).
 - **Tampermonkey-Menü:** „Speichern unter“-Modus umschalten (nur erstes Medium / alle Medien), Dateinamen-Muster ändern und Medien-Cache leeren.
@@ -60,7 +60,7 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 **Русский 🇷🇺**
 - **Изображения, видео и GIF** — одна кнопка на твит; по умолчанию диалог «Сохранить как» открывается для первого медиа (настраивается: все медиа через меню Tampermonkey).
 - **Сначала выбор файла, затем загрузка:** поддерживаемые Chromium-браузеры открывают первый диалог до потоковой записи на диск. Предзагрузка ускоряет поиск URL. Без File System Access или активного действия пользователя используется прежний путь `GM_download`. Для остальных медиа сохраняются режимы first/all.
-- **Надёжное извлечение URL:** X.com показывает видео/GIF только как постеры — xLoader объединяет X API (`conversation.json`, повторный запрос live-токена при ошибках авторизации) с видимыми DOM-медиа (постеры, изображения карточек статей `card_img`) и определяет реальные MP4-URL через performance buffer воспроизведения.
+- **Поиск медиа:** используются кэш, метаданные отображаемого твита, X API, видимые медиа и progressive/HLS/трансляции. Собираются только поддерживаемые записи; манифесты и начальные сегменты не являются самостоятельными видео.
 - **Имена файлов:** по умолчанию `@{handle}_{id}_{index}.{ext}` (например `@elonmusk_123456789_1.mp4`) — настраивается через меню Tampermonkey: плейсхолдеры `{handle}` `{id}` `{index}` `{ext}` `{date}` `{time}` `{type}`.
 - **Макет:** кнопка клонируется из существующей кнопки панели действий X.com и идеально подстраивается (десктоп и мобильные).
 - **Меню Tampermonkey:** переключение режима «Сохранить как» (только первое медиа / все), смена шаблона имени файла и очистка кэша медиа.
@@ -68,11 +68,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 ## How it works / Technik / Как это работает
 
-**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Click fallback chain (cache miss): X API → live-token retry → DOM merge (posters, article-card images; video MP4s resolved via the playback performance buffer) → error message. No external dependencies, no server.
+**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Media resolution uses cached/rendered metadata, the X API and DOM/progressive/HLS/broadcast fallbacks. No external dependencies, no server.
 
-**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Fallback-Kette beim Klick (Cache-Miss): X-API → Live-Token-Retry → DOM-Merge (Poster, Artikel-Card-Bilder; Video-MP4s über den Performance-Buffer) → Fehlermeldung. Keine externen Abhängigkeiten, keine Server.
+**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Medienauflösung über Cache/gerenderte Metadaten, X-API und DOM-/progressive/HLS-/Broadcast-Fallbacks. Keine externen Abhängigkeiten, keine Server.
 
-**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Цепочка при клике (кэш-промах): X API → повторный запрос live-токена → объединение DOM (постеры, изображения карточек; видео-MP4 через performance buffer) → сообщение об ошибке. Без внешних зависимостей и серверов.
+**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Медиа определяются через кэш/метаданные, X API и DOM/progressive/HLS/трансляции. Без внешних зависимостей и серверов.
 
 ## Version history / Versionshistorie / История версий
 
@@ -103,7 +103,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste Version: **v1.0.33** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.33**; aktueller lokaler Prüfstand: **v1.0.39-dev** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.39-dev (nur lokal)** — gehärtete Wiederanbindung der Fortschrittsanzeige nach Timeline-DOM-Recycling: recycelte Buttons übernehmen keine fremden Tweet-Tasks, entfernte Buttons werden aus laufenden Tasks bereinigt und mehrere sichtbare Darstellungen desselben Tweets erhalten denselben Fortschritt.
 
 - **v1.0.33** — unterstützte HLS-/Player-Card-/Broadcast-Aufzeichnungen, MPEG-TS-Ausgabe, Fortschritt und bestätigter Abbruch per erneutem Klick.
 
@@ -161,7 +163,7 @@ Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v
 
 ## Development / Entwicklung / Разработка
 
-Current source / aktuelle Quelle: **v1.0.33**, identical to the approved GitHub source. Earlier v1.0.28 is preserved only as a local historical archive. See [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
+Published source / veröffentlichte Quelle: **v1.0.33**. The local working source is the unpublished **v1.0.39-dev** test build: it retains the previous hardening and media fixes, restores a running download's progress after timeline DOM recycling, rejects cross-tweet button reuse, prunes detached bindings and mirrors progress across visible representations; see [HANDOVER v1.0.39-dev](memory/HANDOVER_v1.0.39-dev.md). Earlier test builds remain historical local archives.
 
 **English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins (checked with Node.js 22.23.2). Run the syntax check below from the project root. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
@@ -173,7 +175,7 @@ Current source / aktuelle Quelle: **v1.0.33**, identical to the approved GitHub 
 node --check xLoader.user.js
 ```
 
-Historical test scaffolds: 83 checks last passed against local v1.0.28; they are retained as local work and are not a new v1.0.33 acceptance result. For this unchanged v1.0.33 release, syntax and source/asset integrity are checked. HLS download and cancellation were confirmed by the user; see [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md). Native dialog timing is not newly measured.
+The v1.0.34-dev hardening and later local fixes remain documented in their handovers. The current v1.0.39-dev DOM-rebinding hardening is locally tested until installed and verified by scrolling away from and back to a running download in Tampermonkey. The published v1.0.33 browser confirmation remains documented in [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
 
 | Path / Pfad / Путь | Purpose / Zweck / Назначение |
 |---|---|

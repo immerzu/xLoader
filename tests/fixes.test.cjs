@@ -20,6 +20,7 @@ function slice(from, to) {
 // ---- CONFIG-Mock (nur benötigte Felder) ----
 const CONFIG = {
   mediaSelectors: ['img', 'video', 'source'],
+  tweetSelector: 'article[data-testid="tweet"]',
   containerSelector: '[data-testid="videoPlayer"],[data-testid="videoComponent"],[data-testid="tweetPhoto"],[data-testid="tweetVideo"]',
   dataUrlAttrs: ['data-src', 'data-url', 'data-image-url', 'data-video-url', 'data-media-url'],
   btnAttribute: 'data-xloader',
@@ -27,6 +28,9 @@ const CONFIG = {
   cacheTtlMs: 5 * 60 * 1000,
   maxParallelPrefetch: 3,
   maxPrefetchQueue: 30,
+  maxCacheEntries: 200,
+  maxPrefetchSeenEntries: 500,
+  performanceEntryMaxAgeMs: 30000,
   requestTimeoutMs: 60000
 };
 
@@ -34,9 +38,17 @@ const CONFIG = {
 const log = { info() {}, warn() {}, error() {} };
 function createButton() { return null; }            // Aktionsleiste fehlt
 function observeForPrefetch() {}
+const runningDownloadsByTweet = new Map();
+function bindRunningDownloadButton(task, btn) { task.reboundButton = btn; }
+const runningDownloads = new WeakMap();
+function detachRunningDownloadButton(task, btn) { task.detachedButton = btn; runningDownloads.delete(btn); }
 let apiResponse = { media: [{ url: 'https://pbs.twimg.com/media/API.jpg?name=orig', ext: 'jpg' }] };
 function fetchTweetData() { return Promise.resolve({}); }
 function parseApiData() { return apiResponse; }
+function renderedTweetMedia() { return []; } // Isolierter Legacy-Fix-Harness; echte Props separat getestet.
+function ensureNotCancelled(signal) { if (signal && signal.aborted) throw new Error('abgebrochen'); }
+function abortableDelay(ms) { return new Promise(resolve => realSetTimeout(resolve, ms)); }
+function isCancellation(err, signal) { return !!(signal && signal.aborted) || !!(err && err.name === 'AbortError'); }
 
 // ---- Timer: kurze Delays (Poll-Schleife) echt, lange Delays nur registriert ----
 const realSetTimeout = global.setTimeout;
@@ -56,8 +68,8 @@ function drainLongTimers(ms) {
 
 // ---- Performance-Mock: pro Zyklus (clearResourceTimings) ist der 1. Abruf leer ----
 const perfEntries = [
-  'https://video.twimg.com/amplify_video/ID1/vid/avc1/0/0/1/a.mp4',
-  'https://video.twimg.com/amplify_video/ID2/vid/avc1/0/0/2/b.mp4'
+  'https://video.twimg.com/amplify_video/ID1/vid/avc1/1280x720/a.mp4',
+  'https://video.twimg.com/amplify_video/ID2/vid/avc1/1920x1080/b.mp4'
 ];
 const perf = {
   entries: perfEntries,
@@ -154,7 +166,7 @@ eval([B_dom, B_names, B_names2, B_merge, B_prefetch, B_scan].join('\n') + `
   extractDomMedia, findMediaElement, hasMediaIndicator, getHandle, getTweetId,
   extFromUrl, mediaIdOf, normBase, mergeDomItems,
   prefetch, failPrefetch, prefetchSeen, prefetchRetries, mediaCache,
-  getCachedItems, prefetchQueue, processTweet
+  getCachedItems, prefetchQueue, processTweet, runningDownloadsByTweet, runningDownloads
 };`);
 const X = globalThis.__x;
 
@@ -202,6 +214,32 @@ const sleep = ms => new Promise(r => realSetTimeout(r, ms));
     late.dataset.xloaderRechecked === '3' && immediateTimers >= 1,
     'dataset=' + late.dataset.xloaderRechecked + ', Timer=' + immediateTimers);
 
+  // Bereits vorhandener Button, dessen Badge durch X entfernt wurde: Zustand
+  // des laufenden Tweet-Downloads muss erneut an denselben Button gebunden werden.
+  const recycled = article();
+  recycled.append(link('/user/status/123456789'));
+  recycled.append(img('https://pbs.twimg.com/media/DOM.jpg'));
+  const existingButton = new El('button', { 'data-xloader': '1' });
+  recycled.append(existingButton);
+  const runningTask = {};
+  X.runningDownloadsByTweet.set('123456789', runningTask);
+  X.processTweet(recycled);
+  check('F2b processTweet: vorhandener Button erhält laufenden Zustand erneut',
+    runningTask.reboundButton === existingButton, 'Button wurde nicht erneut gebunden');
+  X.runningDownloadsByTweet.delete('123456789');
+
+  const reused = article();
+  reused.append(link('/user/status/987654321'));
+  reused.append(img('https://pbs.twimg.com/media/REUSED.jpg'));
+  const reusedButton = new El('button', { 'data-xloader': '1' });
+  reused.append(reusedButton);
+  const oldTask = { tweetId: '123456789' };
+  X.runningDownloads.set(reusedButton, oldTask);
+  X.processTweet(reused);
+  check('F2c processTweet: recycelter Button löst falschen alten Tweet-Task',
+    oldTask.detachedButton === reusedButton && !X.runningDownloads.has(reusedButton),
+    'alter Task blieb am neuen Tweet gebunden');
+
   // ===== F3: failPrefetch — kein Retry bei 429/401/403, Retry bei transienten Fehlern =====
   longTimers.length = 0;
   X.prefetchSeen.add('T429');
@@ -238,8 +276,8 @@ const sleep = ms => new Promise(r => realSetTimeout(r, ms));
   check('F5a mergeDomItems: beide Poster-MP4s aufgelöst',
     merged.length === 2 && merged.every(i => i.url.indexOf('/vid/avc1/') !== -1),
     JSON.stringify(merged));
-  check('F5b mergeDomItems: ein gemeinsamer Poll-Zyklus (1 clear, 2 Abrufe statt 2/4)',
-    perf.clears === 1 && perf.totalCalls === 2,
+  check('F5b mergeDomItems: ein gemeinsamer Poll-Zyklus (1 clear, 3 Abrufe einschließlich HLS-Prüfung)',
+    perf.clears === 1 && perf.totalCalls === 3,
     'clears=' + perf.clears + ', calls=' + perf.totalCalls);
 
   // ===== F6: Dedup — Poster, dessen Video die API liefert, wird nicht erneut aufgelöst =====
@@ -275,7 +313,8 @@ const sleep = ms => new Promise(r => realSetTimeout(r, ms));
     X.getTweetId(outer2) === '987654321', 'erhalten: ' + X.getTweetId(outer2));
 
   // ===== F8–F10: onDownloadClick — Fehlerfreigabe, Statuszuordnung, Doppelklick =====
-  const B_click = slice('async function onDownloadClick', '// ============================ Button-Injektion');
+  const B_click = slice('function pruneTaskButtons', 'function normBase') +
+    '\n' + slice('async function onDownloadClick', '// ============================ Button-Injektion');
   eval(`var saveAsMode = 'first';
 async function selectDownloadFile() { return null; } // Picker tested separately
 var lastApiStatus = null; // nur für die Altfassung (v1.0.23) nötig
@@ -285,12 +324,20 @@ function hideProgress() {}
 function showProgress() {}
 function flashError(btn, msg) { flashMessages.push(msg); }
 function downloadUrl(url, name, saveAs, onProgress) { downloads.push(name); return Promise.resolve(); }
+function hlsUrl() { return false; }
 function formatFilename() { return 'f'; }
 function getFilenameTemplate() { return 't'; }
 function sanitizeFilenamePart(s) { return s; }
 function getCachedItems() { return null; }
+function broadcastFromDom() { return null; }
 var mediaCache = new Map();
 var prefetchSeen = new Set();
+var prefetchSeenAt = new Map();
+var runningDownloads = new WeakMap();
+var runningDownloadsByTweet = new Map();
+function setCachedItems(id, items) { mediaCache.set(String(id), { items: items, fetchedAt: Date.now() }); }
+function showCancelPopup() {}
+function closeCancelPopup() {}
 function loadItemsLive() { return Promise.resolve({ items: [], apiStatus: 429 }); }
 function mergeDomItems() { return Promise.resolve([]); }
 function getTweetId() { return 'ID1'; }
@@ -310,7 +357,7 @@ function getHandle() { return 'u'; }
   const b8 = mkBtn();
   try { await C.onDownloadClick({}, b8); } catch (e) { /* alter Code: Exception */ }
   check('F8 onDownloadClick: Ausnahme => Button wieder frei + "Fehler beim Laden"',
-    b8.disabled === false && C.flashMessages[0] === 'Fehler beim Laden',
+    b8.disabled === false && /^Fehler beim Laden/.test(C.flashMessages[0]),
     'disabled=' + b8.disabled + ', msg=' + C.flashMessages[0]);
 
   // F9: 429 aus dem Live-Abruf => Rate-Limit-Meldung, kein Download
@@ -324,13 +371,13 @@ function getHandle() { return 'u'; }
     'msg=' + C.flashMessages[0] + ', downloads=' + C.downloads.length + ', disabled=' + b9.disabled);
 
   // F10: Doppelklick-Guard — zweiter Klick während des Laufs wird ignoriert
-  C.setLoad(function () { return Promise.resolve({ items: [{ url: 'u', ext: 'jpg' }], apiStatus: null }); });
+  C.setLoad(function () { return Promise.resolve({ items: [{ url: 'https://pbs.twimg.com/media/F10.jpg', ext: 'jpg' }], apiStatus: null }); });
   C.setMerge(function (t, items) { return Promise.resolve(items); });
   C.downloads.length = 0;
   const b10 = mkBtn();
   await Promise.all([C.onDownloadClick({}, b10), C.onDownloadClick({}, b10)]);
   check('F10 onDownloadClick: Doppelklick lädt nur einmal',
-    C.downloads.length === 1, 'downloads=' + C.downloads.length);
+    C.downloads.length === 1, 'downloads=' + C.downloads.length + ', msg=' + C.flashMessages[C.flashMessages.length - 1]);
 
   console.log('\n' + (failures === 0 ? 'ALLE FIXTESTS BESTANDEN' : failures + ' TEST(S) FEHLGESCHLAGEN'));
   process.exitCode = failures === 0 ? 0 : 1;

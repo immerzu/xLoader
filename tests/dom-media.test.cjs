@@ -147,21 +147,22 @@ check('normalizeMediaUrl: tweet_video_thumb -> echte MP4',
   normalizeMediaUrl('https://pbs.twimg.com/tweet_video_thumb/XYZ?format=jpg') ===
     'https://video.twimg.com/tweet_video/XYZ.mp4');
 check('normalizeMediaUrl: externe URL wird abgelehnt', normalizeMediaUrl('https://example.com/x.jpg') === null);
-check('normalizeMediaUrl: m3u8 bleibt unverändert (kein mp4-Umbau)',
+check('normalizeMediaUrl: zulässige HLS-Playlist bleibt Downloadquelle',
   normalizeMediaUrl('https://video.twimg.com/ext_tw_video/123/pu/pl/abc.m3u8') ===
     'https://video.twimg.com/ext_tw_video/123/pu/pl/abc.m3u8');
 
 // 4. Fortschrittsbedingung (Logik aus onDownloadClick, Zeile ~1283-1291)
-function shouldShowProgress(ext, progress) {
-  if (!progress || ext !== 'mp4') return false;
+function progressDisplay(ext, progress) {
+  if (!progress || ext !== 'mp4') return 'hidden';
   const total = Number(progress.total);
-  if (!isFinite(total) || total < 5 * 1024 * 1024) return false;
-  return true;
+  if (!isFinite(total) || total <= 0) return 'indeterminate';
+  if (total < 5 * 1024 * 1024) return 'hidden';
+  return 'percent';
 }
-check('Fortschritt: Bild (jpg) => kein Badge', shouldShowProgress('jpg', { done: 1, total: 50 * 1024 * 1024 }) === false);
-check('Fortschritt: kleines Video (3 MB) => kein Badge', shouldShowProgress('mp4', { done: 1, total: 3 * 1024 * 1024 }) === false);
-check('Fortschritt: großes Video (50 MB) => Badge', shouldShowProgress('mp4', { done: 1, total: 50 * 1024 * 1024 }) === true);
-check('Fortschritt: Video ohne total (NaN) => kein Badge', shouldShowProgress('mp4', { done: 1 }) === false);
+check('Fortschritt: Bild (jpg) => kein Badge', progressDisplay('jpg', { done: 1, total: 50 * 1024 * 1024 }) === 'hidden');
+check('Fortschritt: kleines Video (3 MB) => kein dauerhaftes Badge', progressDisplay('mp4', { done: 1, total: 3 * 1024 * 1024 }) === 'hidden');
+check('Fortschritt: großes Video (50 MB) => Prozent', progressDisplay('mp4', { done: 1, total: 50 * 1024 * 1024 }) === 'percent');
+check('Fortschritt: Video ohne total => laufende neutrale Anzeige', progressDisplay('mp4', { done: 1 }) === 'indeterminate');
 
 console.log('\n' + (failures === 0 ? 'ALLE TESTS BESTANDEN' : failures + ' TEST(S) FEHLGESCHLAGEN'));
 process.exit(failures === 0 ? 0 : 1);

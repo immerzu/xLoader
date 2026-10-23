@@ -1,13 +1,13 @@
-# xLoader — FACT SHEET (Stand: v1.0.33, 2026-10-21)
+# xLoader — FACT SHEET (Arbeitsstand: v1.0.39-dev, Release: v1.0.33, 2026-10-23)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.33 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.39-dev dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.33`). Dialogoptimierung aus der Nutzer-Testfassung, anschließend ausdrücklich beauftragter Streamingfix: Status 0 zulassen, keinen Fetch-timeout:0, onloadend anfordern, HTTP-Abschluss vor Dateiübernahme prüfen.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, lokal `@version 1.0.39-dev`). Enthält Härtung, Quoted-Video-Fix sowie gehärteten Videofortschritt nach Timeline-DOM-Recycling.
 - **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -17,11 +17,18 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
 - **Verifizierter Release-Stand:** v1.0.33, Commit `204d9d64d0070cc75b6bfa75473abda0f81eda29`, Blob `c30c868bcd10baa27c98d1bdc602a1bb961c4fd0`. Aktueller Einstieg: `HANDOVER_v1.0.33.md`. v1.0.25/v1.0.28 bleiben historische lokale Fassungen.
 
-## Aktueller Stand (v1.0.33)
+## Aktueller Arbeitsstand (v1.0.39-dev; nicht veröffentlicht)
+
+- **v1.0.39-dev, 2026-10-23:** DOM-Wiederanbindung gehärtet: Ein von X für einen anderen Tweet recycelter Button wird vom alten Task getrennt; entfernte Buttons werden aus WeakMap und Taskliste bereinigt; mehrere verbundene Darstellungen desselben Tweets erhalten synchron denselben Fortschritt. Syntax und 75 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.39-dev.md`.
+- **v1.0.38-dev, 2026-10-23:** Bereits vorhandene xLoader-Buttons werden nach DOM-Änderungen wieder an laufende Tweet-Tasks gebunden. Der Observer berücksichtigt auch reine Entfernungen innerhalb eines Tweets, sodass ein von X entferntes Badge wiederhergestellt wird. Syntax und 73 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.38-dev.md`.
+- **v1.0.37-dev, 2026-10-23:** Laufende Downloads werden zusätzlich nach Tweet-ID geführt. Neu gerenderte Buttons übernehmen Fortschritt, Busy- und Abbruchzustand; Abschluss bereinigt alle Bindungen. Syntax und 73 lokale Subtests erfolgreich; echter Scrolltest mit Tampermonkey noch offen. Details: `HANDOVER_v1.0.37-dev.md`.
+- **v1.0.36-dev, 2026-10-23:** Videotransfers zeigen sofort eine neutrale laufende Anzeige; bei brauchbarer Gesamtgröße ab 5 MiB wechselt sie auf Prozent. Damit bleibt der GM_download-Fallback auch sichtbar, wenn Browser/Tampermonkey keine Fortschrittswerte liefern. Syntax und 72 lokale Subtests erfolgreich; echter Tampermonkey-Test noch offen. Details: `HANDOVER_v1.0.36-dev.md`.
+- **v1.0.35-dev, 2026-10-23:** Verschachtelte `quoted_tweet`-/GraphQL-Medien und Syndication-`mediaDetails` werden ausgewertet. Vollständige Videodaten haben Vorrang vor unvollständigem `entities.media`; ungelöste Video-Poster werden nicht mehr als JPG gespeichert. Referenz-Tweet mit aktueller Live-Metadatenform, vollständiger 22.847.955-Byte-MP4 und lokaler Gesamtsuite geprüft; echter Tampermonkey-Test der neuen Fassung noch offen. Details: `HANDOVER_v1.0.35-dev.md`.
+- **v1.0.34-dev, 2026-10-22:** H1–H7 aus `HARDENING_2026-10-22.md` behoben: vollständige HTTP-Antwort und Mediensignatur, strengere fMP4-/TS-Prüfung, eindeutige Ablehnung von MAP-Wechsel/GAP/Discontinuity, Container-/Endungsabgleich, AbortSignal für Metadaten und Transfers, zentrale HTTPS-/Host-/Pfadprüfung sowie Größen-, Cache-, Queue- und Generationsgrenzen. Zusätzliche Fälle für HLS-Folgeauswahl, Abbruch beim Schreiben, Windows-Dateinamen und veraltete Broadcast-Performance-Einträge geprüft. Syntax und vollständige lokale Suite erfolgreich; kein Browserlauf, keine Veröffentlichung. Details: `HANDOVER_v1.0.34-dev.md`.
+
+## Veröffentlichter Stand (v1.0.33)
 
 - **v1.0.33, 2026-10-21:** Nutzerbestätigter Browser-Praxistest von v1.0.33-dev: HLS-/Broadcast-Download und Abbruchbestätigung beim erneuten Klick, Fortschrittsanzeige beibehalten. Offizielle Fassung v1.0.33: nur Release-Metadaten/-Beschreibungen (Name, Namespace, Versionsangabe, Auto-Update-URLs, Init-Log), Downloadlogik unverändert. Unterstützte Player-Cards, HLS/fMP4, Broadcast-/TS-Streams, `@connect pscp.tv` und Browser-Netzwerk-Fallback; nicht alle geschützten Streams. Tag v1.0.33 und GitHub-Asset erstellt und erneut geprüft; GF-Seite/Rohdatei 1.0.33, Inhalt bis auf Update-URLs identisch. Nachweise in HANDOVER_v1.0.33.md.
-
-
 
 - **v1.0.26, 2026-10-21:** Auf Nutzeranweisung jedes neue Build mit höherer Patchversion ausgeben. Metablock, Changelog, Init-Log und README angepasst, Downloadlogik unverändert. Lokales Build Ausgabe/xLoader-v1.0.26.user.js, SHA-256 E673B1F25F022598A6F114EB46001D953DB6C7956D431E5795F4BC0FF95FD808. Alte Archive erhalten. GitHub-Asset und Raw-Quellen byte-identisch; GF automatisch synchronisiert, nur GF-Update-/Download-URLs abweichend. Nutzer bestätigt schnelle native Windows-Dateiauswahl und beide gespeicherten Videos; Veröffentlichung der unveränderten Bytes ausdrücklich freigegeben. Regel für neue Builds verbindlich in AGENTS.md; bestehende freigegebene Version bei reiner Veröffentlichung nicht erneut erhöhen.
 
@@ -48,12 +55,12 @@ gelten nur für die jeweilige alte Version.
 
 - Medien: `extractDomMedia`, `parseApiData`, `mergeDomItems`, `resolvePosterVideoUrls`.
 - Cache/Prefetch: `getCachedItems`, `schedulePrefetch`, `failPrefetch`.
-- Download: `onDownloadClick`, `selectDownloadFile`, `downloadSelectedFile`, `downloadUrl`.
+- Download: `onDownloadClick`, `selectDownloadFile`, `downloadSelectedFile`, `downloadHlsFile`, `downloadUrl`; Abbruch über `showCancelPopup`.
 - UI: `createButton`, `showProgress`, `processTweet`, `init`.
 
 Historischer Funktionskatalog und alte Datenflüsse:
 [HANDOVER v1.0.23 §5](HANDOVER_v1.0.23.md#5-funktionskatalog-zeilen--v1023).
-Release- und Testnachweise: [HANDOVER v1.0.26](HANDOVER_v1.0.26.md).
+Aktueller lokaler Prüfstand: [HANDOVER v1.0.39-dev](HANDOVER_v1.0.39-dev.md). Release-Nachweise: [HANDOVER v1.0.33](HANDOVER_v1.0.33.md). Frühere Tests bleiben in ihren historischen Handovers eingeordnet.
 Keine zweite veraltete Zeilentabelle hier fortschreiben.
 
 ## Kernabläufe
@@ -62,7 +69,7 @@ Keine zweite veraltete Zeilentabelle hier fortschreiben.
 2. **Prefetch:** erst wenn der Tweet sichtbar wird (IntersectionObserver) → API-Call im Hintergrund (max. 3 parallel, Queue max. 30) → Cache `Map<tweetId,{items,fetchedAt}>`, TTL 5 min. 401/403/429 werden ohne automatischen Retry verworfen. Transiente Fehler und leere Antworten: maximal 2 Retries mit 10-s-Cooldown.
 3. **Klick (Cache-Miss-Fallback-Kette):** X-API (`conversation.json`) → **Live-Token-Retry** (nur bei 401/403/Netzwerkfehler, **NICHT bei 429**) → **DOM-Merge** (`mergeDomItems`: Poster/Standbilder, `card_img`; Video-MP4 via `resolvePosterVideoUrl`) → differenzierte Fehlermeldung (429 / 401+403 / sonst). Cache-Treffer: sofortiger Download ohne API-Call.
 4. **Progressiver Download (Basis v1.0.26):** Bei verfügbaren APIs und aktiver Benutzeraktion erste Dateiauswahl vor dem DOM-Merge; danach GM_xmlhttpRequest-Stream in die gewählte Datei (Fortschritt und Stillstands-Watchdog). Weitere Medien laufen weiterhin über GM_download mit dem first/all-Modus. Ohne Picker/Benutzeraktivierung GM_download auch für das erste Medium. Abbruch der Dateiauswahl beendet die Serie; Fehler geben den Button frei.
-5. **HLS/Abbruch (v1.0.33):** Unterstützte Player-Cards und Aufzeichnungen mit geeigneten HLS-/fMP4-/MPEG-TS-Segmenten; TS gegebenenfalls als `.ts`. `pscp.tv` und alternativer Netzwerkabruf. Fortschritt bleibt; erneuter Buttonklick zeigt Ja/Nein zum Abbruch. Nicht alle geschützten Formate unterstützt. Nutzerbestätigter Browser-Test, keine neue Funktionsänderung beim lokalen Abgleich.
+5. **HLS/Abbruch (v1.0.34-dev lokal):** Unterstützte Player-Cards und abgeschlossene Aufzeichnungen mit validierten HLS-/fMP4-/MPEG-TS-Segmenten; TS nur als `.ts`. MAP-Wechsel, Lücken, Zeitachsenwechsel und unvollständige Fragmente werden abgelehnt. `pscp.tv` und alternativer Netzwerkabruf bleiben erhalten. Fortschritt und Ja/Nein-Abbruch bleiben; die Härtungsfassung ist lokal synthetisch geprüft, noch nicht im Browser abgenommen.
 6. **Token:** Guest-Bearer (fest im Code, aus x.com main.js) + dynamischer Live-Bearer-Token (Regex `A{20,}…`, TTL 1 h, localStorage `xloader-live-token`, Migration alter Key beim ersten Lesen). Header `x-guest-token` immer senden, wenn Guest-Token existiert.
 
 ## Medien-Domains & Typen
@@ -72,6 +79,7 @@ Keine zweite veraltete Zeilentabelle hier fortschreiben.
 - `video.twimg.com/amplify_video/<id>/vid/avc1/…mp4` — echte Videos (Resolver via Performance-Buffer).
 - `video.twimg.com/tweet_video/<id>.mp4` — **GIFs** (auf X.com MP4-Streams; Poster `pbs.twimg.com/tweet_video_thumb/…` wird umgebaut).
 - `abs.twimg.com` — X.com-Scripts (für Live-Token-Suche, `@connect` nötig).
+- `pscp.tv` und Unterdomains — unterstützte Broadcast-/HLS-Aufzeichnungen, gemäß Metablock freigegeben.
 
 ## Bekannte Fallstricke & Erkenntnisse
 
@@ -85,7 +93,7 @@ Keine zweite veraltete Zeilentabelle hier fortschreiben.
 - **`getHandle` über den Medien-Article** (Fixfassung 2026-10-18): maßgeblich ist `article[data-testid="tweet"]`, in dem das Medien-Element liegt — `closest('div[data-testid="User-Name"]')` greift nie, weil dort keine Medien liegen (falscher Handle bei quoted Tweets).
 - **GM_download-Timeout:** ohne `ontimeout`-Pfad deaktiviert ein hängender Download den Button dauerhaft.
 - **Download-Modus/Permission** (Befund 2026-10-18): Im portablen Originalprofil ist `downloads_mode` Default und `downloads` nicht als API-Permission erteilt. Dann hängt `GM_download` ohne Callback (Button bleibt „Lädt Medien …", keine Datei). `off` liefert `not_enabled`. Abhilfe: Modus `native` (oder `downloads` erteilen). Die Fixfassung hat in `downloadUrl` einen 5-min-Stillstands-Watchdog (Fortschritt resettet; SHA-256 `8FA1B0EB…`), der hängende Aufrufe abbricht und `not_enabled`/`not_permitted` mit Handlungshinweis meldet.
-- **Kein Blob-Umweg / kein m3u8→mp4-Umbenennen:** Blob verzögert den Dialog; Playlisten lassen sich nicht einfach umbenennen (kaputte Downloads).
+- **Manifeste und Fragmente:** Eine Playlist oder ein einzelnes Initialisierungssegment ist kein vollständiges Video. Unterstützte HLS-Aufzeichnungen werden in v1.0.33 zusammengesetzt; MPEG-TS erhält gegebenenfalls `.ts`. Die frühe Dateiauswahl bleibt vom eigentlichen Transfer getrennt.
 - **GF-Admin:** zwei Sync-Felder nicht verwechseln (siehe oben); **„Zusätzliche Informationen“ ≠ Changelog-Textarea**.
 - **Manueller GF-Upload (Fallback):** Greasy Forks „Choose File“-Button befüllt die Textarea per Playwright NICHT → FileReader-Trick (eval-basierter Handler) nötig. **Der eval-Trick funktioniert auf greasyfork.org, NICHT auf x.com** (CSP).
 - **Playwright-/DOM-Tests auf x.com:** CSP blockt Inline-Injektion → Skript-Install/-Update nur über offiziellen Tampermonkey-Import bzw. `tm-import.mjs`-Weg (Skill `tampermonkey-install-update`).
@@ -98,7 +106,7 @@ Der maßgebliche Changelog steht im Kommentar am Anfang von `xLoader.user.js`.
 Die dreisprachige Übersicht steht in [README.md](../README.md#version-history--versionshistorie--история-версий).
 Historische Zustände bleiben in den versionsbezogenen Handovers und im Journal
 erhalten. v1.0.25 war nur lokal; veröffentlichter Nachfolger von v1.0.24 ist
-v1.0.26; aktueller Quellstand v1.0.33. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
+v1.0.26; veröffentlichter Quellstand v1.0.33, lokaler Arbeitsstand v1.0.39-dev. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
 
 ## Build- & Release-Regeln (verbindlich)
 
@@ -110,7 +118,7 @@ benötigen den jeweiligen Nutzerauftrag; reine Dokumentationspflege ändert kein
 2. **Version:** Neues Build erhält eine höhere Patchversion (Metablock, Changelog,
    Init-Log). Eine bereits getestete, ausdrücklich freigegebene Fassung zur
    Veröffentlichung unverändert verwenden; nicht erneut hochzählen.
-3. **Tests:** Gemeinsame Befehlsliste in [README.md](../README.md#development--entwicklung--разработка).
+3. **Prüfungen:** Syntaxbefehl und Einordnung historischer Tests in [README.md](../README.md#development--entwicklung--разработка).
    Node.js-Bordmittel, kein npm-Install nötig. Native Dialog-/Speichertests und
    lokale Simulationen als unterschiedliche Nachweise ausweisen.
 4. **Archiv:** Quelle byte-identisch nach `Ausgabe/xLoader-v<VERSION>.user.js`
@@ -142,7 +150,7 @@ dokumentiert; der reguläre Ablauf benötigt keine Skriptinstallation im Browser
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.33; Metablock + Changelog oben |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.39-dev; Metablock + Changelog oben |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.user.js`, ältere `.js` (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |
@@ -162,3 +170,9 @@ Aktuelle Bestandsaufnahme und unklare Kandidaten: [CLEANUP_2026-10-21.md](CLEANU
 Historisch, durch v1.0.33 abgelöst. Initialisierungssegment-Bug belegt und lokal korrigiert;
 83 Tests sowie reale TM-/Windows-Dateien geprüft. Native Pickerlogik bleibt
 unverändert; keine neue Dialogzeitmessung. Details: [HANDOVER v1.0.28](HANDOVER_v1.0.28.md).
+
+## Härtung 2026-10-22
+
+Analyse des v1.0.33-Quellstands und Umsetzung in v1.0.34-dev:
+[Befunde, Korrekturen und Nachweisgrenzen](HARDENING_2026-10-22.md).
+Die Härtung ist lokal getestet, aber noch nicht im Browser/Tampermonkey abgenommen oder veröffentlicht.

@@ -37,7 +37,9 @@ const CONFIG = { requestTimeoutMs: 60000 };
 let opts = null;
 let abortCalls = 0;
 let gmImpl = (o) => { opts = o; return { abort() { abortCalls++; } }; };
-const downloadUrl = new Function('CONFIG', 'GM_download', 'return (' + FN + ')')(CONFIG, (o) => gmImpl(o));
+const downloadUrl = new Function('CONFIG', 'GM_download', 'isMediaUrl', 'hlsUrl', 'ensureNotCancelled',
+  'onDownloadAbort', 'downloadAbortError', 'return (' + FN + ')')(
+  CONFIG, (o) => gmImpl(o), () => true, () => false, () => {}, () => () => {}, () => Object.assign(new Error('abgebrochen'), {name:'AbortError'}));
 
 let pass = 0, fail = 0;
 function check(name, cond, extra) {

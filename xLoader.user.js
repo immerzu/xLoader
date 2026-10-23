@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.33
+// @version      1.0.39-dev
 // @description  Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich die erste Dateiauswahl vor dem Streaming. Mit Fortschrittsanzeige und Abbruchbestätigung beim erneuten Klick. GM_download-Fallback und Dateinamenoptionen.
 // @description:en Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Supported browsers open the first file picker before streaming. Progress indicator, cancel confirmation on a second click, GM_download fallback and filename options.
 // @description:ru Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. В совместимых браузерах первый диалог сохранения открывается до загрузки. Есть прогресс, подтверждение отмены при повторном нажатии, резервный GM_download и настройка имён файлов.
@@ -28,6 +28,38 @@
 // ==/UserScript==
 
 /*
+ * xLoader v1.0.39-dev (Härtung der DOM-Wiederanbindung)
+ *  - Wiederverwendete Buttons sicher von Tasks anderer Tweet-IDs lösen.
+ *  - Entfernte Buttons sofort aus WeakMap und Taskliste entfernen.
+ *  - Fortschritt an alle verbundenen Darstellungen desselben Tweets spiegeln.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.38-dev (Fortschritts-Badge nach Teil-Recycling wiederherstellen)
+ *  - Bereits vorhandene xLoader-Buttons bei DOM-Änderungen erneut anbinden.
+ *  - Auch reine Entfernungen innerhalb eines Tweets zur Wiederherstellung prüfen.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.37-dev (Fortschritt nach Timeline-DOM-Recycling)
+ *  - Laufende Downloads zusätzlich nach Tweet-ID verfolgen.
+ *  - Neu gerenderte Downloadbuttons wieder an Status, Prozent und Abbruch binden.
+ *  - Fortschritt bleibt nach Weg- und Zurückscrollen sichtbar.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.36-dev (Fortschritt auch ohne bekannte Gesamtgröße)
+ *  - Videotransfers zeigen sofort eine neutrale laufende Anzeige.
+ *  - Sobald Bytes und Gesamtgröße verfügbar sind, wechselt sie auf Prozent.
+ *  - GM_download ohne onprogress/total bleibt damit sichtbar aktiv.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.35-dev (Quoted-Video statt Vorschaubild herunterladen)
+ *  - Medien aus verschachtelten quoted_tweet-/GraphQL-Ergebnissen erkennen.
+ *  - Syndication-mediaDetails als echte Videoquelle auswerten.
+ *  - Ungelöste Video-Poster nie als JPG-Erfolg bzw. Download anbieten.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.34-dev (Härtung von Medienintegrität und Ressourcen)
+ *  - HTTP-Teilantworten, Fehlertexte und unplausible Medienantworten ablehnen.
+ *  - HLS-Initialisierung, Fragmente, Track-IDs, Zeitachsen, Lücken und
+ *    tatsächlichen TS-/MP4-Container vor dem Finalisieren prüfen.
+ *  - Abbruchsignal bis in Metadaten-, Token-, Broadcast- und Medienabrufe führen.
+ *  - Medienhosts/-pfade strikt validieren; Cache, Retries und Segmentgrößen
+ *    begrenzen und Cacheleeren gegen alte Hintergrundaufgaben absichern.
+ * ---------------------------------------------------------------------------
  * xLoader v1.0.33 (HLS-/Broadcast-Downloads und Abbruchbestätigung)
  *  - Erneuter Klick auf den laufenden Downloadpfeil zeigt kleine Bestätigung.
  *  - Nein/Schließen setzt ohne Unterbrechung fort; Ja bricht laufende
@@ -378,6 +410,12 @@
         cacheTtlMs: 5 * 60 * 1000,        // X.com-Medien-URLs sind temporär
         maxParallelPrefetch: 3,           // Rate-Limiting vermeiden
         maxPrefetchQueue: 30,             // Schutz bei schnellem Scrollen
+        maxCacheEntries: 200,
+        maxPrefetchSeenEntries: 500,
+        maxHlsManifestBytes: 2 * 1024 * 1024,
+        maxHlsSegmentBytes: 256 * 1024 * 1024,
+        maxHlsSegments: 12000,
+        performanceEntryMaxAgeMs: 30000,
         // X-API (bewährte Strategie aus funktionierendem Referenz-Skript)
         api: {
             endpoint: function (statusId) {
@@ -471,6 +509,17 @@
         signal.addEventListener('abort', fn, { once: true });
         return function () { signal.removeEventListener('abort', fn); };
     }
+    function abortableDelay(ms, signal) {
+        ensureNotCancelled(signal);
+        return new Promise(function (resolve, reject) {
+            var timer = setTimeout(function () { cleanup(); resolve(); }, ms);
+            var cleanup = onDownloadAbort(signal, function () {
+                clearTimeout(timer);
+                cleanup();
+                reject(downloadAbortError());
+            });
+        });
+    }
 
     // ============================ DOM-Medien-Extraktion ====================
     // (nur als Fallback für statische Bilder, wenn die API nicht erreichbar ist)
@@ -480,6 +529,67 @@
     function allowedVideoHost(host) {
         return host === 'video.twimg.com' || host === 'video.pscp.tv' ||
             host.endsWith('.video.pscp.tv');
+    }
+    function allowedImageUrl(url) {
+        try {
+            var u = new URL(url);
+            return u.protocol === 'https:' && u.hostname === 'pbs.twimg.com' &&
+                /^\/(?:media|card_img|amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb)\//.test(u.pathname);
+        } catch (e) { return false; }
+    }
+    function isVideoPosterUrl(url) {
+        try {
+            var u = new URL(url);
+            return u.protocol === 'https:' && u.hostname === 'pbs.twimg.com' &&
+                /^\/(?:amplify_video_thumb|ext_tw_video_thumb)\//.test(u.pathname);
+        } catch (e) { return false; }
+    }
+    function downloadableImageUrl(url) {
+        try {
+            var u = new URL(url);
+            return u.protocol === 'https:' && u.hostname === 'pbs.twimg.com' &&
+                /^\/(?:media|card_img)\//.test(u.pathname);
+        } catch (e) { return false; }
+    }
+    function responseHeader(headers, name) {
+        var match = new RegExp('(?:^|\\r?\\n)' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+            ':\\s*([^\\r\\n]+)', 'i').exec(headers || '');
+        return match ? match[1].trim() : '';
+    }
+    function assertFullHttpResponse(status, headers, label) {
+        if (status !== 200) throw new Error(label + ' HTTP ' + status +
+            (status === 206 ? ' (unerwartete Teilantwort)' : ''));
+        if (responseHeader(headers, 'content-range')) throw new Error(label + ': unerwartete Teilantwort');
+    }
+    function assertResponseSize(headers, actual, limit, label) {
+        var declared = Number(responseHeader(headers, 'content-length'));
+        if (isFinite(declared) && declared > limit) throw new Error(label + ': Antwort zu groß');
+        if (actual > limit) throw new Error(label + ': Antwort zu groß');
+        if (declared > 0 && actual !== declared) throw new Error(label + ': unvollständige Antwort');
+    }
+    function assertMediaContentType(headers, url) {
+        var type = responseHeader(headers, 'content-type').split(';')[0].trim().toLowerCase();
+        if (!type) return;
+        var valid = allowedImageUrl(url) ? (/^image\//.test(type) || type === 'application/octet-stream') :
+            (type === 'video/mp4' || type === 'application/mp4' || type === 'application/octet-stream');
+        if (!valid) throw new Error('Download: unzulässiger Inhaltstyp ' + type);
+    }
+    function assertMediaPrefix(bytes, url) {
+        if (!bytes || bytes.length < 12) throw new Error('Download: unplausibler Medieninhalt');
+        if (allowedImageUrl(url)) {
+            var jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+            var png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+                bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+            var gif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38 &&
+                (bytes[4] === 0x37 || bytes[4] === 0x39) && bytes[5] === 0x61;
+            var webp = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+                bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+            if (!jpeg && !png && !gif && !webp) throw new Error('Download: ungültige Bildsignatur');
+            return;
+        }
+        var declared = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
+        var type = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]);
+        if (type !== 'ftyp' || declared < 8) throw new Error('Download: ungültige MP4-Signatur');
     }
     function hlsUrl(url) {
         try {
@@ -541,6 +651,75 @@
     function mp4SetId(bytes, b, offset, id) {
         new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(b.start + offset, id);
     }
+    function mp4TrackId(bytes, trak) {
+        var tkhd = mp4First(bytes, 'tkhd', trak.start + trak.head, trak.end);
+        if (!tkhd) throw new Error('HLS: Trackheader fehlt');
+        var offset = bytes[tkhd.start + 8] === 1 ? 28 : 20;
+        var id = mp4GetId(bytes, tkhd, offset);
+        if (!id) throw new Error('HLS: ungültige Track-ID');
+        return id;
+    }
+    function mp4ValidateInit(bytes) {
+        var ftyp = mp4First(bytes, 'ftyp'), moov = mp4First(bytes, 'moov');
+        if (!ftyp || !moov) throw new Error('HLS: ungültige MP4-Initialisierung');
+        var children = mp4Children(bytes, moov);
+        var tracks = children.filter(function (b) { return b.type === 'trak'; });
+        var mvex = children.find(function (b) { return b.type === 'mvex'; });
+        if (!tracks.length || !mvex) throw new Error('HLS: Initialisierung ohne Track/mvex');
+        var ids = tracks.map(function (t) { return mp4TrackId(bytes, t); });
+        if (new Set(ids).size !== ids.length) throw new Error('HLS: doppelte Track-ID');
+        var trexIds = mp4Children(bytes, mvex).filter(function (b) { return b.type === 'trex'; })
+            .map(function (b) { return mp4GetId(bytes, b, 12); });
+        if (!ids.every(function (id) { return trexIds.indexOf(id) !== -1; }))
+            throw new Error('HLS: Track ohne TREX');
+        return ids;
+    }
+    function mp4ValidateFragment(bytes, allowedIds) {
+        var boxes = mp4Boxes(bytes);
+        var moofs = boxes.filter(function (b) { return b.type === 'moof'; });
+        var mdats = boxes.filter(function (b) { return b.type === 'mdat'; });
+        if (moofs.length !== 1 || !mdats.length || !mdats.some(function (b) { return b.end - b.start > b.head; }))
+            throw new Error('HLS: unvollständiges MP4-Medienfragment');
+        var mediaBytes = mdats.reduce(function (sum, b) { return sum + b.end - b.start - b.head; }, 0);
+        var trafs = mp4Children(bytes, moofs[0]).filter(function (b) { return b.type === 'traf'; });
+        if (!trafs.length) throw new Error('HLS: Fragment ohne Track');
+        var sampleCount = 0, decodeTimes = [];
+        trafs.forEach(function (traf) {
+            var parts = mp4Children(bytes, traf);
+            var tfhd = parts.find(function (b) { return b.type === 'tfhd'; });
+            var tfdt = parts.find(function (b) { return b.type === 'tfdt'; });
+            var truns = parts.filter(function (b) { return b.type === 'trun'; });
+            if (!tfhd || !tfdt || !truns.length) throw new Error('HLS: Fragment ohne tfhd/tfdt/trun');
+            var id = mp4GetId(bytes, tfhd, 12);
+            if (allowedIds.indexOf(id) === -1) throw new Error('HLS: unbekannte Fragment-Track-ID');
+            var tfdtView = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            var version = bytes[tfdt.start + 8];
+            var time = version === 1 ? tfdtView.getUint32(tfdt.start + 12) * 4294967296 +
+                tfdtView.getUint32(tfdt.start + 16) : tfdtView.getUint32(tfdt.start + 12);
+            if (!Number.isSafeInteger(time) || time < 0) throw new Error('HLS: ungültige Fragmentzeit');
+            decodeTimes.push(time);
+            truns.forEach(function (trun) {
+                var count = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(trun.start + 12);
+                if (!count) throw new Error('HLS: Fragment ohne Samples');
+                sampleCount += count;
+            });
+        });
+        if (!sampleCount) throw new Error('HLS: Fragment ohne Samples');
+        if (sampleCount > mediaBytes) throw new Error('HLS: Sampleanzahl passt nicht zu den Mediendaten');
+        return { decodeTime: Math.min.apply(null, decodeTimes), samples: sampleCount };
+    }
+    function validateTsSegment(bytes) {
+        if (bytes.length < 188 || bytes.length % 188 !== 0) throw new Error('HLS: ungültiges MPEG-TS-Segment');
+        var hasPayload = false;
+        for (var i = 0; i < bytes.length; i += 188) {
+            if (bytes[i] !== 0x47 || (bytes[i + 1] & 0x80)) throw new Error('HLS: ungültiges MPEG-TS-Segment');
+            var pid = ((bytes[i + 1] & 0x1f) << 8) | bytes[i + 2];
+            var control = (bytes[i + 3] >> 4) & 3;
+            if (!control) throw new Error('HLS: ungültiges MPEG-TS-Paket');
+            if (pid !== 0x1fff && (control & 1)) hasPayload = true;
+        }
+        if (!hasPayload) throw new Error('HLS: TS-Segment ohne Nutzdaten');
+    }
     function mp4CombinedInit(videoInit, audioInit) {
         // X liefert oft zwei einzelne MP4-Tracks. Die Boxen der Audio-Spur
         // werden mit eigener Track-ID in den gemeinsamen moov übernommen.
@@ -600,10 +779,12 @@
         return result;
     }
     function hlsPlaylist(text, baseUrl) {
+        if (typeof text !== 'string' || text.length > CONFIG.maxHlsManifestBytes)
+            throw new Error('HLS: Playlist zu groß');
         if (!/^#EXTM3U(?:\s|$)/.test(text)) throw new Error('HLS: ungültige Playlist');
         var lines = text.replace(/\r/g, '').split('\n').map(function (s) { return s.trim(); });
         var variants = [], audio = [], entries = [], initUrl = null, endlist = false;
-        var pendingInf = null, duration = 0, discontinuities = 0;
+        var pendingInf = null, duration = 0, discontinuities = 0, gapPending = false;
         for (var i = 0; i < lines.length; i++) {
             var line = lines[i];
             if (!line) continue;
@@ -618,7 +799,9 @@
             } else if (line.indexOf('#EXT-X-MAP:') === 0) {
                 var ma = hlsAttributes(line.slice(11));
                 if (!ma.URI || ma.BYTERANGE) throw new Error('HLS: nicht unterstütztes EXT-X-MAP');
-                initUrl = new URL(ma.URI, baseUrl).href;
+                var nextInit = new URL(ma.URI, baseUrl).href;
+                if (initUrl && initUrl !== nextInit) throw new Error('HLS: EXT-X-MAP-Wechsel nicht unterstützt');
+                initUrl = nextInit;
             } else if (line.indexOf('#EXTINF:') === 0) {
                 pendingInf = Number(line.slice(8).split(',')[0]);
                 if (!isFinite(pendingInf) || pendingInf <= 0) throw new Error('HLS: ungültige Segmentdauer');
@@ -628,14 +811,19 @@
                 throw new Error('HLS: Byte-Range nicht unterstuetzt');
             } else if (line.indexOf('#EXT-X-DISCONTINUITY') === 0) {
                 discontinuities++;
+            } else if (line === '#EXT-X-GAP') {
+                gapPending = true;
             } else if (line === '#EXT-X-ENDLIST') {
                 endlist = true;
             } else if (line.charAt(0) !== '#' && pendingInf !== null) {
+                if (gapPending) throw new Error('HLS: Playlist enthält eine Medienlücke');
                 entries.push({ url: new URL(line, baseUrl).href, time: duration, duration: pendingInf });
                 duration += pendingInf;
                 pendingInf = null;
+                gapPending = false;
             }
         }
+        if (pendingInf !== null || gapPending) throw new Error('HLS: unvollständiger Playlist-Eintrag');
         return { variants: variants, audio: audio, initUrl: initUrl, segments: entries, endlist: endlist, discontinuities: discontinuities };
     }
     // GM_xmlhttpRequest läuft im Tampermonkey-Hintergrund. Für Broadcast-
@@ -655,9 +843,19 @@
             return browserFetch(url, { method: 'GET', mode: 'cors', credentials: 'omit',
                 signal: controller ? controller.signal : undefined });
         }).then(async function (response) {
-            if (!response || !response.ok) throw new Error('Browser HTTP ' + (response ? response.status : '?'));
-            if (kind === 'text') return response.text();
+            if (!response) throw new Error('Browser HTTP ?');
+            assertFullHttpResponse(response.status, response.headers && response.headers.get ?
+                Array.from(response.headers.entries()).map(function (v) { return v[0] + ': ' + v[1]; }).join('\n') : '', 'Browser');
+            var limit = kind === 'text' ? CONFIG.maxHlsManifestBytes : CONFIG.maxHlsSegmentBytes;
+            var declared = Number(response.headers && response.headers.get ? response.headers.get('content-length') : 0);
+            if (isFinite(declared) && declared > limit) throw new Error('Browser-Fetch: Antwort zu groß');
+            if (kind === 'text') {
+                var value = await response.text();
+                if (value.length > limit) throw new Error('Browser-Fetch: Antwort zu groß');
+                return value;
+            }
             var data = new Uint8Array(await response.arrayBuffer());
+            assertResponseSize('content-length: ' + (declared || ''), data.length, limit, 'Browser-Fetch');
             if (!data.length) throw new Error('Browser-Fetch: leeres Segment');
             return data;
         }).finally(function () {
@@ -685,12 +883,20 @@
             var opts = { method: 'GET', url: url, timeout: CONFIG.requestTimeoutMs,
                 onload: function (r) {
                     if (signal && signal.aborted) { settle(downloadAbortError()); return; }
-                    if (r.status < 200 || r.status >= 300) {
-                        settle(new Error('GM HTTP ' + r.status)); return;
-                    }
-                    if (kind === 'text') settle(null, r.responseText || r.response);
-                    else if (r.response && r.response.byteLength) settle(null, new Uint8Array(r.response));
-                    else settle(new Error('GM: leeres Segment'));
+                    try {
+                        assertFullHttpResponse(r.status, r.responseHeaders, 'GM');
+                        var limit = kind === 'text' ? CONFIG.maxHlsManifestBytes : CONFIG.maxHlsSegmentBytes;
+                        if (kind === 'text') {
+                            var text = r.responseText || r.response;
+                            if (typeof text !== 'string' || !text.length) throw new Error('GM: leere Playlist');
+                            assertResponseSize(r.responseHeaders, text.length, limit, 'GM');
+                            settle(null, text);
+                        } else if (r.response && r.response.byteLength) {
+                            var bytes = new Uint8Array(r.response);
+                            assertResponseSize(r.responseHeaders, bytes.length, limit, 'GM');
+                            settle(null, bytes);
+                        } else throw new Error('GM: leeres Segment');
+                    } catch (e) { settle(e); }
                 },
                 onerror: function (r) {
                     if (signal && signal.aborted) { settle(downloadAbortError()); return; }
@@ -768,25 +974,34 @@
         });
         if ((!video.initUrl && !transportStream) || !video.segments.length)
             throw new Error('HLS: weder fMP4- noch TS-Videosegmente');
-        if (!transportStream && video.discontinuities)
-            throw new Error('HLS: fMP4 mit Zeitachsenwechsel nicht unterstuetzt');
+        if (video.discontinuities)
+            throw new Error('HLS: Zeitachsenwechsel nicht unterstützt');
         if (!video.endlist) throw new Error('HLS: laufender Stream ohne vollständiges Aufnahmeende');
-        if (video.segments.length > 12000) throw new Error('HLS: Segmentzahl zu groß');
+        if (video.segments.length > CONFIG.maxHlsSegments) throw new Error('HLS: Segmentzahl zu groß');
         var audio = null;
         if (audioUrl) {
             audio = hlsPlaylist(await hlsFetch(audioUrl, 'text', signal), audioUrl);
             if (!audio.initUrl || !audio.endlist || !audio.segments.length) throw new Error('HLS: Audio-Aufnahme nicht vollständig');
-            if (audio.segments.length > 12000) throw new Error('HLS: Audio-Segmentzahl zu groß');
+            if (audio.discontinuities) throw new Error('HLS: Audio-Zeitachsenwechsel nicht unterstützt');
+            if (audio.segments.length > CONFIG.maxHlsSegments) throw new Error('HLS: Audio-Segmentzahl zu groß');
         }
         if (transportStream && audio) throw new Error('HLS: TS-Aufnahme mit separater Tonspur nicht unterstuetzt');
         ensureNotCancelled(signal);
         return { video: video, audio: audio, transportStream: transportStream };
     }
-    async function downloadHlsFile(url, file, onProgress, signal) {
+    async function downloadHlsFile(url, file, onProgress, signal, expectedExt) {
         var writable = null;
         try {
             ensureNotCancelled(signal);
             var playlist = await hlsResolve(url, signal);
+            var actualExt = playlist.transportStream ? 'ts' : 'mp4';
+            if (expectedExt && expectedExt.toLowerCase() !== actualExt) {
+                var mismatch = new Error('HLS: tatsächlicher Container .' + actualExt +
+                    ' stimmt nicht mit .' + expectedExt + ' überein; erneut speichern');
+                mismatch.code = 'HLS_CONTAINER_MISMATCH';
+                mismatch.actualExt = actualExt;
+                throw mismatch;
+            }
             ensureNotCancelled(signal);
             // fMP4-Init enthält die Codec-Informationen; erst danach schreiben.
             if (playlist.transportStream) {
@@ -797,9 +1012,7 @@
                 for (var si = 0; si < playlist.video.segments.length; si++) {
                     var segment = await hlsFetch(playlist.video.segments[si].url, 'bytes', signal);
                     ensureNotCancelled(signal);
-                    // MPEG-TS besteht aus Paketen zu je 188 Bytes mit Sync 0x47.
-                    if (segment.length < 376 || segment.length % 188 !== 0 || segment[0] !== 0x47 || segment[188] !== 0x47)
-                        throw new Error('HLS: ungueltiges MPEG-TS-Segment');
+                    validateTsSegment(segment);
                     await writable.write(segment);
                     ensureNotCancelled(signal);
                     tsCount += segment.length;
@@ -814,9 +1027,11 @@
             }
             var videoInit = await hlsFetch(playlist.video.initUrl, 'bytes', signal);
             var audioInit = playlist.audio ? await hlsFetch(playlist.audio.initUrl, 'bytes', signal) : null;
+            var videoTrackIds = mp4ValidateInit(videoInit);
+            var audioTrackIds = audioInit ? mp4ValidateInit(audioInit) : null;
             var muxInfo = audioInit ? mp4CombinedInit(videoInit, audioInit) : null;
             var init = muxInfo ? muxInfo.init : videoInit;
-            if (!mp4First(init, 'moov') || !mp4First(init, 'ftyp')) throw new Error('HLS: ungültige MP4-Initialisierung');
+            var outputTrackIds = mp4ValidateInit(init);
             var jobs = [];
             playlist.video.segments.forEach(function (s) { jobs.push({ url: s.url, time: s.time, kind: 'video' }); });
             if (playlist.audio) playlist.audio.segments.forEach(function (s) { jobs.push({ url: s.url, time: s.time, kind: 'audio' }); });
@@ -825,14 +1040,18 @@
             writable = await file.createWritable();
             ensureNotCancelled(signal);
             await writable.write(init);
+            var lastTime = { video: -1, audio: -1 };
             for (var i = 0; i < jobs.length; i++) {
                 var bytes = await hlsFetch(jobs[i].url, 'bytes', signal);
                 ensureNotCancelled(signal);
-                if (!mp4Boxes(bytes).some(function (b) { return b.type === 'moof'; }) ||
-                    !mp4Boxes(bytes).some(function (b) { return b.type === 'mdat'; })) {
-                    throw new Error('HLS: unvollständiges MP4-Medienfragment');
+                var sourceIds = jobs[i].kind === 'audio' ? audioTrackIds : videoTrackIds;
+                var fragment = mp4ValidateFragment(bytes, sourceIds);
+                if (fragment.decodeTime < lastTime[jobs[i].kind]) throw new Error('HLS: nicht monotone Fragmentzeit');
+                lastTime[jobs[i].kind] = fragment.decodeTime;
+                if (jobs[i].kind === 'audio') {
+                    bytes = mp4AudioFragment(bytes, muxInfo.originalAudioId, muxInfo.newAudioId);
+                    mp4ValidateFragment(bytes, outputTrackIds);
                 }
-                if (jobs[i].kind === 'audio') bytes = mp4AudioFragment(bytes, muxInfo.originalAudioId, muxInfo.newAudioId);
                 await writable.write(bytes);
                 ensureNotCancelled(signal);
                 if (onProgress) onProgress({ done: i + 1, total: jobs.length, percent: Math.round((i + 1) * 100 / jobs.length), segmented: true });
@@ -859,21 +1078,16 @@
 
     function isMediaUrl(url) {
         if (!url || typeof url !== 'string') return false;
+        var parsed;
         try {
-            new URL(url);
+            parsed = new URL(url);
         } catch (e) {
             return false;
         }
-        if (url.indexOf('pbs.twimg.com/media/') !== -1) return true;
-        // Artikel-Card-Bilder (verlinkte Artikel, pbs.twimg.com/card_img/...)
-        if (url.indexOf('pbs.twimg.com/card_img/') !== -1) return true;
-        if (url.indexOf('video.twimg.com/') !== -1) return isProgressiveVideoUrl(url) || hlsUrl(url);
-        // Video-Poster als Medien akzeptieren (letzter Notnagel: Standbilder,
-        // wenn die X-API die echten Videos nicht liefert — z. B. bei gekürzten
-        // Konversations-Antworten). tweet_video_thumb wird von
-        // normalizeMediaUrl vorher in die echte GIF-MP4 umgebaut.
-        if (/pbs\.twimg\.com\/(amplify_video_thumb|ext_tw_video_thumb|tweet_video_thumb)\//.test(url)) return true;
-        return false;
+        if (parsed.protocol !== 'https:') return false;
+        if (parsed.hostname === 'pbs.twimg.com') return allowedImageUrl(url);
+        if (parsed.hostname === 'video.twimg.com') return isProgressiveVideoUrl(url) || hlsUrl(url);
+        return hlsUrl(url);
     }
 
     function normalizeMediaUrl(url) {
@@ -1029,6 +1243,43 @@
         return cookies;
     }
 
+    function gmTextRequest(url, headers, signal, label) {
+        ensureNotCancelled(signal);
+        return new Promise(function (resolve, reject) {
+            var handle = null, settled = false, cleanupAbort = function () {};
+            function finish(err, value) {
+                if (settled) return;
+                settled = true;
+                cleanupAbort();
+                if (err) reject(err); else resolve(value);
+            }
+            function abortRequest() {
+                try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (_) {}
+                finish(downloadAbortError());
+            }
+            cleanupAbort = onDownloadAbort(signal, abortRequest);
+            if (signal && signal.aborted) { abortRequest(); return; }
+            try {
+                handle = GM_xmlhttpRequest({
+                    method: 'GET', url: url, headers: headers || {}, timeout: CONFIG.requestTimeoutMs,
+                    onload: function (res) {
+                        if (signal && signal.aborted) { abortRequest(); return; }
+                        if (res.status === 200) finish(null, res.responseText);
+                        else {
+                            var err = new Error(label + ' HTTP ' + res.status);
+                            err.status = res.status;
+                            finish(err);
+                        }
+                    },
+                    onerror: function () { finish(new Error(label + ' Netzwerk-/CORS-Fehler')); },
+                    ontimeout: function () { finish(new Error(label + ' Timeout')); },
+                    onabort: function () { finish(signal && signal.aborted ? downloadAbortError() : new Error(label + ' abgebrochen')); }
+                });
+                if (signal && signal.aborted) abortRequest();
+            } catch (e) { finish(new Error(label + ': Aufruf gescheitert')); }
+        });
+    }
+
     var liveToken = getCachedLiveToken();
 
     function getCachedLiveToken() {
@@ -1066,7 +1317,7 @@
      * Bearer-Token (Guest oder Live), x-csrf-token aus Cookie ct0,
      * x-twitter-active-user, ggf. x-guest-token.
      */
-    function fetchTweetData(statusId) {
+    async function fetchTweetData(statusId, signal) {
         var url = CONFIG.api.endpoint(statusId);
         var cookies = getCookies();
         var headers = {
@@ -1079,33 +1330,10 @@
             headers['x-guest-token'] = cookies.gt;
         }
 
-        return new Promise(function (resolve, reject) {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: url,
-                headers: headers,
-                timeout: CONFIG.requestTimeoutMs,
-                onload: function (res) {
-                    if (res.status === 200) {
-                        try {
-                            resolve(JSON.parse(res.responseText));
-                        } catch (e) {
-                            reject(new Error('API JSON-Parse-Fehler'));
-                        }
-                    } else {
-                        var err = new Error('API HTTP ' + res.status);
-                        err.status = res.status;
-                        reject(err);
-                    }
-                },
-                onerror: function () {
-                    reject(new Error('API Netzwerk-/CORS-Fehler'));
-                },
-                ontimeout: function () {
-                    reject(new Error('API Timeout'));
-                }
-            });
-        });
+        var text = await gmTextRequest(url, headers, signal, 'API');
+        ensureNotCancelled(signal);
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('API JSON-Parse-Fehler'); }
     }
 
     /**
@@ -1124,8 +1352,9 @@
             }
             var id = obj.rest_id || obj.id_str || obj.id ||
                 (obj.legacy && obj.legacy.id_str) || null;
-            if (id && (obj.extended_entities || obj.entities || obj.full_text ||
-                obj.card || (obj.legacy && (obj.legacy.extended_entities || obj.legacy.card)))) {
+            if (id && (obj.extended_entities || obj.entities || obj.mediaDetails || obj.full_text || obj.text ||
+                obj.card || obj.quoted_tweet || obj.quoted_status_result ||
+                (obj.legacy && (obj.legacy.extended_entities || obj.legacy.card)))) {
                 var prior = map.get(String(id));
                 // Ein späteres abgespecktes Objekt darf die vollständigere
                 // Tweet-/Card-Repräsentation nicht überschreiben.
@@ -1187,35 +1416,29 @@
         }
         return null;
     }
-    function gmBroadcastJson(url) {
+    async function gmBroadcastJson(url, signal) {
         var cookies = getCookies();
-        return new Promise(function (resolve, reject) {
-            var headers = {authorization: 'Bearer ' + (liveToken || CONFIG.api.guestBearer),
-                'x-twitter-active-user': 'yes', 'x-csrf-token': cookies.ct0 || '',
-                'x-twitter-client-language': cookies.lang || 'en'};
-            if (cookies.gt) headers['x-guest-token'] = cookies.gt;
-            GM_xmlhttpRequest({method: 'GET', url: url, timeout: CONFIG.requestTimeoutMs,
-                headers: headers,
-                onload: function (r) {
-                    if (r.status !== 200) return reject(new Error('Broadcast API HTTP ' + r.status));
-                    try { resolve(JSON.parse(r.responseText)); }
-                    catch (e) { reject(new Error('Broadcast: Antwort unlesbar')); }
-                },
-                onerror: function () { reject(new Error('Broadcast: Netzwerkfehler')); },
-                ontimeout: function () { reject(new Error('Broadcast: API-Timeout')); }
-            });
-        });
+        var headers = {authorization: 'Bearer ' + (liveToken || CONFIG.api.guestBearer),
+            'x-twitter-active-user': 'yes', 'x-csrf-token': cookies.ct0 || '',
+            'x-twitter-client-language': cookies.lang || 'en'};
+        if (cookies.gt) headers['x-guest-token'] = cookies.gt;
+        var text = await gmTextRequest(url, headers, signal, 'Broadcast API');
+        ensureNotCancelled(signal);
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('Broadcast: Antwort unlesbar'); }
     }
-    async function broadcastPlaybackUrl(id) {
+    async function broadcastPlaybackUrl(id, signal) {
         // X-Broadcast-Aufloesung: Broadcast-ID -> media_key -> Replay-Manifest.
         log.info('Lade Broadcast-Metadaten (ID: ' + id + ')');
-        var show = await gmBroadcastJson(location.origin + '/i/api/1.1/broadcasts/show.json?ids=' + encodeURIComponent(id));
+        var show = await gmBroadcastJson(location.origin + '/i/api/1.1/broadcasts/show.json?ids=' + encodeURIComponent(id), signal);
+        ensureNotCancelled(signal);
         var entry = show.broadcasts && show.broadcasts[id];
         var mediaKey = entry && entry.media_key;
         if (!mediaKey) throw new Error('Broadcast: media_key nicht verfuegbar');
         log.info('Broadcast-Medienschluessel gefunden; lade Replay-Adresse.');
         var data = await gmBroadcastJson(location.origin + '/i/api/1.1/live_video_stream/status/' +
-            encodeURIComponent(mediaKey) + '?client=web&use_syndication_guest_id=false&cookie_set_host=x.com');
+            encodeURIComponent(mediaKey) + '?client=web&use_syndication_guest_id=false&cookie_set_host=x.com', signal);
+        ensureNotCancelled(signal);
         var source = data.source || {};
         var candidates = [source.noRedirectPlaybackUrl, source.location, source.url];
         for (var i = 0; i < candidates.length; i++) {
@@ -1316,6 +1539,12 @@
         var sources = [];
         if (legacy.extended_entities && Array.isArray(legacy.extended_entities.media)) {
             sources = legacy.extended_entities.media;
+        } else if (Array.isArray(tweetObj.mediaDetails)) {
+            // cdn.syndication.twimg.com liefert dieselben video_info-Daten
+            // unter mediaDetails statt unter legacy.extended_entities. Das
+            // parallele entities.media enthält dort nur Linkdaten ohne Typ
+            // und darf diese vollständige Quelle nicht verdrängen.
+            sources = tweetObj.mediaDetails;
         } else if (legacy.entities && Array.isArray(legacy.entities.media)) {
             sources = legacy.entities.media;
         }
@@ -1323,7 +1552,10 @@
             var m = sources[i];
             if (!m) continue;
             if (m.type === 'photo' && m.media_url_https) {
-                media.push({ url: originalImageUrl(m.media_url_https), ext: extFromUrl(m.media_url_https) || 'jpg' });
+                var imageUrl = originalImageUrl(m.media_url_https);
+                if (imageUrl && downloadableImageUrl(imageUrl)) {
+                    media.push({ url: imageUrl, ext: extFromUrl(imageUrl) || 'jpg' });
+                }
             } else if (m.type === 'video' || m.type === 'animated_gif') {
                 var variants = (m.video_info && m.video_info.variants) || [];
                 var best = null, playlist = null;
@@ -1350,6 +1582,35 @@
         return media;
     }
 
+    function unwrapTweetResult(value) {
+        var seen = new Set();
+        while (value && typeof value === 'object' && !seen.has(value)) {
+            seen.add(value);
+            if (value.legacy || value.extended_entities || value.entities || value.mediaDetails) return value;
+            if (value.result && typeof value.result === 'object') value = value.result;
+            else if (value.tweet && typeof value.tweet === 'object') value = value.tweet;
+            else break;
+        }
+        return value && typeof value === 'object' ? value : null;
+    }
+
+    function nestedRelatedTweets(tweetObj) {
+        if (!tweetObj || typeof tweetObj !== 'object') return [];
+        var legacy = tweetObj.legacy || {};
+        var candidates = [
+            tweetObj.quoted_tweet, tweetObj.retweeted_status,
+            tweetObj.quoted_status_result, tweetObj.retweeted_status_result,
+            legacy.quoted_tweet, legacy.retweeted_status,
+            legacy.quoted_status_result, legacy.retweeted_status_result
+        ];
+        var result = [];
+        for (var i = 0; i < candidates.length; i++) {
+            var related = unwrapTweetResult(candidates[i]);
+            if (related && result.indexOf(related) === -1) result.push(related);
+        }
+        return result;
+    }
+
     function renderedTweetMedia(tweet, statusId) {
         // Ausschließlich den Ziel-Tweet lesen, nicht dessen Nachbarn/Replies.
         // React-Metadaten sind optional; kein Eingriff in X oder dessen APIs.
@@ -1371,10 +1632,11 @@
     function originalImageUrl(src) {
         try {
             var u = new URL(src);
+            if (!allowedImageUrl(u.href)) return null;
             u.searchParams.set('name', 'orig');
             return u.toString();
         } catch (e) {
-            return src;
+            return null;
         }
     }
 
@@ -1387,6 +1649,13 @@
         var map = collectTweetObjects(data);
         var tweet = map.get(String(statusId)) || null;
         var media = tweet ? apiMediaFromTweet(tweet) : [];
+
+        if (!media.length && tweet) {
+            var nested = nestedRelatedTweets(tweet);
+            for (var n = 0; n < nested.length && !media.length; n++) {
+                media = apiMediaFromTweet(nested[n]);
+            }
+        }
 
         if (!media.length && tweet) {
             var quotedSource = tweet.legacy || tweet;
@@ -1405,28 +1674,17 @@
      * (Regex auf das bekannte AAAA...-Muster). Wird bei API-Auth-Fehlern
      * verwendet und in localStorage gecacht (TTL 1 h).
      */
-    function fetchLiveBearerToken() {
+    function fetchLiveBearerToken(signal) {
         var TOKEN_RE = CONFIG.api.liveTokenRe;
 
         function gmGet(url) {
-            return new Promise(function (resolve, reject) {
-                GM_xmlhttpRequest({
-                    method: 'GET',
-                    url: url,
-                    timeout: CONFIG.requestTimeoutMs,
-                    onload: function (r) {
-                        if (r.status === 200) resolve(r.responseText);
-                        else reject(new Error('HTTP ' + r.status));
-                    },
-                    onerror: function () { reject(new Error('Netzwerkfehler')); },
-                    ontimeout: function () { reject(new Error('Timeout')); }
-                });
-            });
+            return gmTextRequest(url, {}, signal, 'Token');
         }
 
         return (function () {
             var scriptUrls = [];
             return gmGet(location.origin + '/').then(function (html) {
+                ensureNotCancelled(signal);
                 // 1) Zuerst direkt im HTML suchen — Inline-Scripts enthalten den
                 //    Token oft bereits.
                 var inline = TOKEN_RE.exec(html);
@@ -1439,9 +1697,12 @@
                 while ((m = srcRe.exec(html)) !== null) {
                     var url = m[1];
                     if (url.indexOf('//') === 0) url = 'https:' + url;
-                    if (url.indexOf('http') !== 0) continue;
-                    if (url.indexOf('twimg.com/') === -1 && url.indexOf('twitter.com/') === -1 && url.indexOf('x.com/') === -1) continue;
-                    scriptUrls.push(url);
+                    try {
+                        var parsedScript = new URL(url, location.origin);
+                        if (parsedScript.protocol !== 'https:' ||
+                            !['abs.twimg.com', 'x.com', 'twitter.com'].includes(parsedScript.hostname)) continue;
+                        scriptUrls.push(parsedScript.href);
+                    } catch (e) { continue; }
                 }
 
                 if (!scriptUrls.length) throw new Error('keine Scripts im HTML');
@@ -1449,7 +1710,9 @@
                 var chain = Promise.reject(new Error('keine Scripts'));
                 scriptUrls.slice(0, 5).forEach(function (scriptUrl) {
                     chain = chain.catch(function () {
+                        ensureNotCancelled(signal);
                         return gmGet(scriptUrl).then(function (js) {
+                            ensureNotCancelled(signal);
                             var match = TOKEN_RE.exec(js);
                             if (match && match[1]) return match[1];
                             throw new Error('kein Token in ' + scriptUrl);
@@ -1467,24 +1730,65 @@
     var mediaCache = new Map();
     // Tweet-IDs, für die bereits ein Prefetch geplant/gestartet wurde
     var prefetchSeen = new Set();
+    var prefetchSeenAt = new Map();
     // Fehlversuche pro Tweet-ID (max. MAX_PREFETCH_RETRIES, dann aufgeben)
     var prefetchRetries = new Map();
     var prefetchQueue = [];
+    var prefetchRetryTimers = new Map();
+    var cacheGeneration = 0;
     var activePrefetches = 0;
     var MAX_PREFETCH_RETRIES = 2;
     var PREFETCH_RETRY_DELAY_MS = 10000;
+
+    function pruneMediaState() {
+        var now = Date.now();
+        mediaCache.forEach(function (entry, id) {
+            if (!entry || now - entry.fetchedAt > CONFIG.cacheTtlMs) mediaCache.delete(id);
+        });
+        while (mediaCache.size > CONFIG.maxCacheEntries) mediaCache.delete(mediaCache.keys().next().value);
+        prefetchSeen.forEach(function (id) {
+            var seenAt = prefetchSeenAt.get(id) || 0;
+            if (now - seenAt > CONFIG.cacheTtlMs) {
+                prefetchSeen.delete(id);
+                prefetchSeenAt.delete(id);
+            }
+        });
+        while (prefetchSeen.size > CONFIG.maxPrefetchSeenEntries) {
+            var oldest = prefetchSeen.values().next().value;
+            prefetchSeen.delete(oldest);
+            prefetchSeenAt.delete(oldest);
+        }
+    }
+    function setCachedItems(tweetId, items) {
+        pruneMediaState();
+        mediaCache.delete(tweetId);
+        mediaCache.set(tweetId, { items: items, fetchedAt: Date.now() });
+        pruneMediaState();
+    }
+    function markPrefetchSeen(tweetId) {
+        prefetchSeen.delete(tweetId);
+        prefetchSeen.add(tweetId);
+        prefetchSeenAt.set(tweetId, Date.now());
+        pruneMediaState();
+    }
+    function queuePrefetch(tweetId, generation) {
+        if (prefetchQueue.length >= CONFIG.maxPrefetchQueue) return false;
+        markPrefetchSeen(tweetId);
+        prefetchQueue.push({ tweetId: tweetId, generation: generation });
+        drainPrefetchQueue();
+        return true;
+    }
 
     /**
      * Liefert gecachte Medien-Items für eine Tweet-ID oder null.
      * Abgelaufene Einträge (TTL 5 min) werden dabei entfernt.
      */
     function getCachedItems(tweetId) {
+        pruneMediaState();
         var entry = mediaCache.get(tweetId);
         if (!entry) return null;
-        if (Date.now() - entry.fetchedAt > CONFIG.cacheTtlMs) {
-            mediaCache.delete(tweetId);
-            return null;
-        }
+        mediaCache.delete(tweetId);
+        mediaCache.set(tweetId, entry);
         return entry.items;
     }
 
@@ -1501,32 +1805,32 @@
         // Tweet im Retry-Cooldown (z. B. nach 429) nicht sofort neu starten —
         // der geplante Retry übernimmt das nach PREFETCH_RETRY_DELAY_MS.
         if (prefetchRetries.has(tweetId)) return;
-        if (prefetchQueue.length >= CONFIG.maxPrefetchQueue) return;
-
-        prefetchSeen.add(tweetId);
-        prefetchQueue.push(tweetId);
-        drainPrefetchQueue();
+        queuePrefetch(tweetId, cacheGeneration);
     }
 
-    async function prefetch(tweetId) {
+    async function prefetch(tweetId, generation) {
+        generation = generation == null ? cacheGeneration : generation;
         activePrefetches++;
         try {
+            if (generation !== cacheGeneration) return;
             var data = await fetchTweetData(tweetId);
+            if (generation !== cacheGeneration) return;
             var parsed = parseApiData(data, tweetId);
             if (parsed.media && parsed.media.length) {
-                mediaCache.set(tweetId, { items: parsed.media, fetchedAt: Date.now() });
+                setCachedItems(tweetId, parsed.media);
                 prefetchRetries.delete(tweetId);
                 // Freigeben, sobald der Cache den Tweet abdeckt: Nach Ablauf der
                 // TTL (5 min) und erneutem Sichtbarwerden darf wieder vorgeladen
                 // werden — der Cache-Guard verhindert Doppel-Prefetches vorher.
                 prefetchSeen.delete(tweetId);
+                prefetchSeenAt.delete(tweetId);
                 log.info('Prefetch abgeschlossen für Tweet ' + tweetId +
                     ' (' + parsed.media.length + ' Medium/Medien).');
             } else {
-                failPrefetch(tweetId, 'leere Medien-Antwort');
+                failPrefetch(tweetId, 'leere Medien-Antwort', null, generation);
             }
         } catch (err) {
-            failPrefetch(tweetId, err.message, err.status);
+            if (generation === cacheGeneration) failPrefetch(tweetId, err.message, err.status, generation);
         } finally {
             activePrefetches--;
             drainPrefetchQueue();
@@ -1541,32 +1845,44 @@
      * Netzwerk-/Timeout-/Parse-Fehler und leere Antworten werden bis zu
      * MAX_PREFETCH_RETRIES Mal mit PREFETCH_RETRY_DELAY_MS Cooldown wiederholt.
      */
-    function failPrefetch(tweetId, reason, status) {
+    function failPrefetch(tweetId, reason, status, generation) {
+        generation = generation == null ? cacheGeneration : generation;
+        if (generation !== cacheGeneration) return;
         if (status === 401 || status === 403 || status === 429) {
             prefetchRetries.delete(tweetId);
+            prefetchSeen.delete(tweetId);
+            prefetchSeenAt.delete(tweetId);
             log.warn('Prefetch für Tweet ' + tweetId + ' ohne Retry (HTTP ' + status + '): ' + reason);
             return;
         }
         var tries = (prefetchRetries.get(tweetId) || 0) + 1;
         if (tries >= MAX_PREFETCH_RETRIES) {
             prefetchRetries.delete(tweetId);
+            prefetchSeen.delete(tweetId);
+            prefetchSeenAt.delete(tweetId);
             log.warn('Prefetch für Tweet ' + tweetId + ' endgültig aufgegeben: ' + reason);
             return;
         }
         prefetchRetries.set(tweetId, tries);
         prefetchSeen.delete(tweetId); // Retry erlauben
-        setTimeout(function () {
+        prefetchSeenAt.delete(tweetId);
+        var oldTimer = prefetchRetryTimers.get(tweetId);
+        if (oldTimer) clearTimeout(oldTimer);
+        var timer = setTimeout(function () {
+            prefetchRetryTimers.delete(tweetId);
+            if (generation !== cacheGeneration) return;
             if (prefetchSeen.has(tweetId) || getCachedItems(tweetId) !== null) return;
-            prefetchSeen.add(tweetId);
             log.info('Prefetch-Retry (' + tries + '/' + MAX_PREFETCH_RETRIES + ') für Tweet ' + tweetId);
-            prefetch(tweetId); // fire-and-forget
+            queuePrefetch(tweetId, generation);
         }, PREFETCH_RETRY_DELAY_MS);
+        prefetchRetryTimers.set(tweetId, timer);
     }
 
     function drainPrefetchQueue() {
         while (activePrefetches < CONFIG.maxParallelPrefetch && prefetchQueue.length) {
-            var tweetId = prefetchQueue.shift();
-            prefetch(tweetId); // fire-and-forget
+            var job = prefetchQueue.shift();
+            if (!job || job.generation !== cacheGeneration) continue;
+            prefetch(job.tweetId, job.generation); // fire-and-forget
         }
     }
 
@@ -1623,7 +1939,18 @@
     }
 
     function sanitizeFilenamePart(str) {
-        return String(str).replace(/[\\/:*?"<>|]/g, '_');
+        var value = String(str).replace(/[\u0000-\u001f\u007f\\/:*?"<>|]/g, '_')
+            .replace(/[ .]+$/g, '').trim();
+        if (!value) value = 'download';
+        var dot = value.lastIndexOf('.');
+        var stem = dot > 0 ? value.slice(0, dot) : value;
+        var suffix = dot > 0 ? value.slice(dot) : '';
+        if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(stem)) stem = '_' + stem;
+        var maxLength = 180;
+        if (stem.length + suffix.length > maxLength) {
+            stem = stem.slice(0, Math.max(1, maxLength - suffix.length)).replace(/[ .]+$/g, '');
+        }
+        return (stem || 'download') + suffix;
     }
 
     function extFromUrl(url) {
@@ -1678,9 +2005,7 @@
      * Dateiinhalte bei Übertragungsfehlern; erst close übernimmt das Ergebnis.
      */
     async function downloadSelectedFile(url, file, onProgress, signal) {
-        if (url.indexOf('video.twimg.com/') !== -1 && !isProgressiveVideoUrl(url)) {
-            throw new Error('Kein vollständiges Video: Playlist oder Medienfragment');
-        }
+        if (!isMediaUrl(url) || hlsUrl(url)) throw new Error('Download: unzulässige direkte Medienadresse');
         ensureNotCancelled(signal);
         var cleanupAbort = function () {};
         var request = null;
@@ -1729,30 +2054,34 @@
                     onloadstart: function (res) {
                         // Tampermonkey startet den Fetch-Stream mit Status 0,
                         // bevor HTTP-Status und Header verfügbar sind.
-                        if (res.status && (res.status < 200 || res.status >= 300)) {
-                            fail(new Error('Download HTTP ' + res.status));
-                        } else if (!res.response || typeof res.response.getReader !== 'function') {
+                        try {
+                            if (res.status) assertFullHttpResponse(res.status, res.responseHeaders, 'Download');
+                            if (res.status) assertMediaContentType(res.responseHeaders, url);
+                        } catch (e) { fail(e); return; }
+                        if (!res.response || typeof res.response.getReader !== 'function') {
                             fail(new Error('Tampermonkey liefert keinen Download-Stream'));
                         } else resolve(res);
                     },
                     onreadystatechange: function (res) {
                         if (res.readyState < 2) return;
                         latestResponse = res;
-                        if (res.status && (res.status < 200 || res.status >= 300)) {
-                            fail(new Error('Download HTTP ' + res.status));
-                        }
+                        try {
+                            if (res.status) assertFullHttpResponse(res.status, res.responseHeaders, 'Download');
+                            if (res.status) assertMediaContentType(res.responseHeaders, url);
+                        } catch (e) { fail(e); }
                     },
                     onload: function (res) {
                         latestResponse = res;
-                        if (res.status < 200 || res.status >= 300) {
-                            fail(new Error('Download HTTP ' + res.status));
-                        } else resolveComplete(res);
+                        try {
+                            assertFullHttpResponse(res.status, res.responseHeaders, 'Download');
+                            assertMediaContentType(res.responseHeaders, url);
+                            resolveComplete(res);
+                        } catch (e) { fail(e); }
                     },
                     // Tampermonkey fordert damit auch das Stream-Endsignal an.
                     onloadend: function (res) {
-                        if (res.status < 200 || res.status >= 300) {
-                            fail(new Error('Download HTTP ' + res.status));
-                        }
+                        try { assertFullHttpResponse(res.status, res.responseHeaders, 'Download'); }
+                        catch (e) { fail(e); }
                     },
                     onerror: function () { fail(new Error('Download: Netzwerkfehler')); },
                     ontimeout: function () { fail(new Error('Download: Timeout')); },
@@ -1770,6 +2099,7 @@
             }
             var total = contentLength(response);
             var done = 0;
+            var prefixParts = [], prefixLength = 0;
             while (true) {
                 var part = await Promise.race([reader.read(), cancelled]);
                 if (transferError) throw transferError;
@@ -1778,6 +2108,11 @@
                 arm();
                 await writable.write(part.value);
                 ensureNotCancelled(signal);
+                if (prefixLength < 64) {
+                    var keep = part.value.subarray(0, Math.min(part.value.byteLength, 64 - prefixLength));
+                    prefixParts.push(new Uint8Array(keep));
+                    prefixLength += keep.byteLength;
+                }
                 done += part.value.byteLength;
                 total = contentLength(latestResponse || response);
                 if (typeof onProgress === 'function') onProgress({ done: done, total: total });
@@ -1785,8 +2120,12 @@
             // Stream-Ende allein beweist keinen erfolgreichen HTTP-Abschluss.
             var finalResponse = await complete;
             if (transferError) throw transferError;
+            assertFullHttpResponse(finalResponse.status, finalResponse.responseHeaders, 'Download');
             total = contentLength(finalResponse);
             if (!done || (total && done !== total)) throw new Error('Download unvollständig');
+            var prefix = new Uint8Array(prefixLength), prefixOffset = 0;
+            prefixParts.forEach(function (part) { prefix.set(part, prefixOffset); prefixOffset += part.byteLength; });
+            assertMediaPrefix(prefix, url);
             ensureNotCancelled(signal);
             await writable.close();
             writable = null;
@@ -1807,9 +2146,7 @@
      * Browser/Downloadmodus (im Standardmodus ggf. erst nach dem Transfer).
      */
     function downloadUrl(url, filename, saveAs, onProgress, signal) {
-        if (url.indexOf('video.twimg.com/') !== -1 && !isProgressiveVideoUrl(url)) {
-            return Promise.reject(new Error('Kein vollständiges Video: Playlist oder Medienfragment'));
-        }
+        if (!isMediaUrl(url) || hlsUrl(url)) return Promise.reject(new Error('Download: unzulässige direkte Medienadresse'));
         ensureNotCancelled(signal);
         return new Promise(function (resolve, reject) {
             var settled = false;
@@ -1980,10 +2317,14 @@
 
     function clearMediaCache() {
         var before = mediaCache.size;
+        cacheGeneration++;
         mediaCache.clear();
         prefetchSeen.clear();
+        prefetchSeenAt.clear();
         prefetchRetries.clear();
         prefetchQueue.length = 0;
+        prefetchRetryTimers.forEach(function (timer) { clearTimeout(timer); });
+        prefetchRetryTimers.clear();
         log.info('Medien-Cache geleert (' + before + ' Einträge entfernt).');
     }
 
@@ -2009,6 +2350,7 @@
     // ============================ Button-Verhalten =========================
 
     var runningDownloads = new WeakMap();
+    var runningDownloadsByTweet = new Map();
     function setBusy(btn, busy) {
         // Ein laufender Download darf den Button nicht deaktivieren:
         // ein erneuter Klick öffnet die Abbruch-Bestätigung.
@@ -2110,7 +2452,7 @@
      * Sichtbare Fortschrittsanzeige: kleines Badge über dem Button-Wrapper.
      * Erscheint nur während eines Downloads (hideProgress blendet es aus).
      */
-    function showProgress(btn, percent) {
+    function showProgress(btn, value) {
         var wrap = getWrap(btn) || btn;
         if (!wrap.style.position) wrap.style.position = 'relative';
         var badge = wrap.querySelector('.xloader-progress');
@@ -2119,7 +2461,7 @@
             badge.className = 'xloader-progress';
             wrap.appendChild(badge);
         }
-        badge.textContent = percent + '%';
+        badge.textContent = (typeof value === 'number') ? value + '%' : (value || '…');
         badge.style.display = 'block';
     }
 
@@ -2127,6 +2469,68 @@
         var wrap = getWrap(btn) || btn;
         var badge = wrap.querySelector('.xloader-progress');
         if (badge) badge.style.display = 'none';
+    }
+
+    function pruneTaskButtons(task) {
+        if (!task || !task.buttons) return;
+        var retained = [];
+        for (var i = 0; i < task.buttons.length; i++) {
+            var candidate = task.buttons[i];
+            if (candidate && candidate.isConnected !== false) retained.push(candidate);
+            else if (candidate) runningDownloads.delete(candidate);
+        }
+        task.buttons = retained;
+        if (task.btn && retained.indexOf(task.btn) === -1) {
+            task.btn = retained.length ? retained[retained.length - 1] : null;
+        }
+    }
+
+    function detachRunningDownloadButton(task, btn, resetUi) {
+        if (!task || !btn) return;
+        runningDownloads.delete(btn);
+        if (task.buttons) task.buttons = task.buttons.filter(function (item) { return item !== btn; });
+        if (task.btn === btn) {
+            closeCancelPopup(task);
+            task.btn = task.buttons && task.buttons.length ? task.buttons[task.buttons.length - 1] : null;
+        }
+        if (resetUi && btn.isConnected !== false) {
+            hideProgress(btn);
+            setBusy(btn, false);
+        }
+    }
+
+    function bindRunningDownloadButton(task, btn) {
+        if (!task || !btn || task.signal.aborted) return;
+        var priorTask = runningDownloads.get(btn);
+        if (priorTask && priorTask !== task) detachRunningDownloadButton(priorTask, btn, false);
+        if (!task.buttons) task.buttons = [];
+        pruneTaskButtons(task);
+        if (task.buttons.indexOf(btn) === -1) task.buttons.push(btn);
+        if (task.btn && task.btn !== btn) closeCancelPopup(task);
+        task.btn = btn;
+        runningDownloads.set(btn, task);
+        setBusy(btn, true);
+        if (task.progressVisible) showProgress(btn, task.progressValue);
+        if (task.statusTitle) btn.title = task.statusTitle;
+    }
+
+    function setTaskProgress(task, value, title) {
+        if (!task) return;
+        task.progressVisible = true;
+        task.progressValue = value;
+        task.statusTitle = title;
+        pruneTaskButtons(task);
+        for (var i = 0; i < task.buttons.length; i++) {
+            showProgress(task.buttons[i], value);
+            task.buttons[i].title = title;
+        }
+    }
+
+    function hideTaskProgress(task) {
+        if (!task) return;
+        task.progressVisible = false;
+        pruneTaskButtons(task);
+        for (var i = 0; i < task.buttons.length; i++) hideProgress(task.buttons[i]);
     }
 
     /**
@@ -2156,7 +2560,7 @@
      * verwarf jedes clearResourceTimings() die bereits geladenen Einträge der
      * vorherigen Poster. Die Wiedergabe wird in jedem Fall wieder gestoppt.
      */
-    async function resolvePosterVideoUrls(tweet, mediaIds) {
+    async function resolvePosterVideoUrls(tweet, mediaIds, signal) {
         var targets = [];
         for (var i = 0; i < mediaIds.length; i++) {
             var mediaId = mediaIds[i];
@@ -2173,12 +2577,14 @@
         if (!targets.length) return {};
 
         try {
+            ensureNotCancelled(signal);
             performance.clearResourceTimings();
             for (var c = 0; c < targets.length; c++) targets[c].player.click();
 
             var deadline = Date.now() + 5000;
             var open = targets.length;
             while (open > 0 && Date.now() < deadline) {
+                ensureNotCancelled(signal);
                 var entries = performance.getEntriesByType('resource');
                 for (var e = 0; e < entries.length; e++) {
                     var u = entries[e].name;
@@ -2191,7 +2597,7 @@
                     }
                 }
                 if (open > 0) {
-                    await new Promise(function (r) { setTimeout(r, 300); });
+                    await abortableDelay(300, signal);
                 }
             }
         } catch (e) { /* Stille ignorieren — Poster bleibt dann Bild-Notnagel */ } finally {
@@ -2240,8 +2646,11 @@
             var countPlaying = 0;
             for (var ai = 0; ai < playingAnywhere.length; ai++) if (!playingAnywhere[ai].paused) countPlaying++;
             if (countPlaying !== 1) return [];
-            var pscpUrls = performance.getEntriesByType('resource').map(function (e) { return e.name; })
-                .filter(function (url) {
+            var now = typeof performance.now === 'function' ? performance.now() : Infinity;
+            var pscpUrls = performance.getEntriesByType('resource').filter(function (entry) {
+                    var observed = Number(entry.responseEnd || entry.startTime || 0);
+                    return isFinite(now) && observed > 0 && now - observed <= CONFIG.performanceEntryMaxAgeMs;
+                }).map(function (e) { return e.name; }).filter(function (url) {
                     try { return hlsUrl(url) && new URL(url).hostname !== 'video.twimg.com'; }
                     catch (e) { return false; }
                 });
@@ -2260,7 +2669,8 @@
         return found;
     }
 
-    async function mergeDomItems(tweet, items) {
+    async function mergeDomItems(tweet, items, signal) {
+        ensureNotCancelled(signal);
         var result = items.slice();
         var performanceItems = performanceHlsFromTweet(tweet);
         for (var perf = 0; perf < performanceItems.length; perf++) {
@@ -2300,12 +2710,16 @@
             if (needsResolve && resolveIds.indexOf(domId) === -1) resolveIds.push(domId);
         }
 
-        var resolved = resolveIds.length ? await resolvePosterVideoUrls(tweet, resolveIds) : {};
+        var resolved = resolveIds.length ? await resolvePosterVideoUrls(tweet, resolveIds, signal) : {};
+        ensureNotCancelled(signal);
         for (var p = 0; p < pending.length; p++) {
             var item = pending[p];
             if (item.id && resolved[item.id]) {
                 result.push({ url: resolved[item.id], ext: 'mp4' });
-            } else {
+            } else if (!isVideoPosterUrl(item.url)) {
+                // Ein Video-Poster ist kein Bildmedium des Tweets. Wenn seine
+                // Videoquelle nicht auflösbar ist, muss der Download scheitern,
+                // statt irreführend ein JPG als Erfolg zu speichern.
                 result.push({ url: item.url, ext: extFromUrl(item.url) });
             }
         }
@@ -2318,12 +2732,12 @@
      * zurückgegeben statt global gespeichert, damit parallele Klicks auf
      * verschiedene Tweets sich die Fehlermeldung nicht überschreiben.
      */
-    async function loadItemsLive(tweetId) {
+    async function loadItemsLive(tweetId, signal) {
         var items = [];
         var apiFailed = false;
         var apiStatus = null;
         try {
-            var data = await fetchTweetData(tweetId);
+            var data = await fetchTweetData(tweetId, signal);
             items = parseApiData(data, tweetId).media;
         } catch (apiErr) {
             apiFailed = true;
@@ -2337,12 +2751,12 @@
         if (!items.length && apiStatus !== 429 && (apiFailed || !liveToken)) {
             log.info('Versuche Live-Bearer-Token-Retry …');
             try {
-                var token = await fetchLiveBearerToken();
+                var token = await fetchLiveBearerToken(signal);
                 if (token) {
                     liveToken = token;
                     cacheLiveToken(token);
                     log.info('Live-Bearer-Token ermittelt.');
-                    var data2 = await fetchTweetData(tweetId);
+                    var data2 = await fetchTweetData(tweetId, signal);
                     items = parseApiData(data2, tweetId).media;
                     apiStatus = null; // zweiter Call war erfolgreich
                 }
@@ -2362,14 +2776,20 @@
      * Fall wieder frei (finally), sonst bliebe er dauerhaft gesperrt.
      */
     async function onDownloadClick(tweet, btn) {
-        var active = runningDownloads.get(btn);
-        if (active) { showCancelPopup(btn, active); return; }
-        var controller = new AbortController();
-        var task = { controller: controller, signal: controller.signal, popup: null, closePopup: null };
-        runningDownloads.set(btn, task);
-        setBusy(btn, true);
-
         var tweetId = getTweetId(tweet);
+        var active = runningDownloads.get(btn) || runningDownloadsByTweet.get(tweetId);
+        if (active) {
+            bindRunningDownloadButton(active, btn);
+            showCancelPopup(btn, active);
+            return;
+        }
+        var controller = new AbortController();
+        var task = { controller: controller, signal: controller.signal, popup: null, closePopup: null,
+            tweetId: tweetId, btn: null, buttons: [], progressVisible: false,
+            progressValue: null, statusTitle: null };
+        runningDownloadsByTweet.set(tweetId, task);
+        bindRunningDownloadButton(task, btn);
+
         var handle = sanitizeFilenamePart(getHandle(tweet));
         var items = [];
         var apiStatus = null;
@@ -2378,11 +2798,15 @@
         var errorMessage = null;
         var selectedFile = null;
         var selectedFilename = null;
+        var retryItems = null;
 
         try {
             ensureNotCancelled(task.signal);
-            var rendered = renderedTweetMedia(tweet, tweetId);
+            var rendered = renderedTweetMedia(tweet, tweetId).filter(function (item) {
+                return !isVideoPosterUrl(item.url);
+            });
             var cached = rendered.length ? rendered : getCachedItems(tweetId);
+            if (cached) cached = cached.filter(function (item) { return !isVideoPosterUrl(item.url); });
             var domBroadcast = broadcastFromDom(tweet);
             if ((!cached || !cached.length) && domBroadcast) cached = [domBroadcast];
             if ((!cached || !cached.length) && tweet.querySelectorAll) {
@@ -2401,7 +2825,7 @@
                 items = cached;
             } else {
                 if (mediaCache.has(tweetId)) mediaCache.delete(tweetId); // abgelaufen
-                var live = await loadItemsLive(tweetId);
+                var live = await loadItemsLive(tweetId, task.signal);
                 items = live.items;
                 apiStatus = live.apiStatus;
             }
@@ -2420,12 +2844,12 @@
             // speichern; Quelle fuer den naechsten Klick kurz zwischenspeichern.
             if (selectedFile && items.length && items[0].ext === 'ts' &&
                 selectedFilename && /\.mp4$/i.test(selectedFilename)) {
-                mediaCache.set(tweetId, { items: items, fetchedAt: Date.now() });
+                setCachedItems(tweetId, items);
                 throw new Error('Broadcast-Quelle ermittelt. Erneut klicken, um .ts als Dateityp zu waehlen.');
             }
             // Immer DOM-Poster/Standbilder ergänzen — auch bei Cache-Treffer,
             // sonst fehlen Medien, die die API (bzw. der Prefetch) nicht liefert.
-            items = await mergeDomItems(tweet, items);
+            items = await mergeDomItems(tweet, items, task.signal);
             ensureNotCancelled(task.signal);
             if (selectedFile && items.length && items[0].ext !== 'mp4' && selectedFilename && /\.mp4$/i.test(selectedFilename)) {
                 // No incorrect extension: the picker chose an MP4 but API found an image.
@@ -2456,12 +2880,25 @@
                     var isVideo = (items[i].ext === 'mp4' || items[i].ext === 'ts');
                     try {
                         log.info('Lade Medien ' + (i + 1) + '/' + items.length + ' → ' + filename);
+                        // GM_download liefert im Browser-API-/Native-Modus nicht
+                        // zuverlässig onprogress oder eine Gesamtgröße. Deshalb
+                        // den laufenden Videotransfer sofort neutral anzeigen.
+                        if (isVideo) {
+                            setTaskProgress(task, '…', 'Lade ' + (i + 1) + '/' + items.length + ' …');
+                        }
                         var reportProgress = function (progress) {
                             // Badge nur bei Videodateien ab einer Mindestgröße — bei
                             // Bildern und kurzen Videos wird nichts angezeigt.
                             if (!progress || !isVideo) return;
                             var total = Number(progress.total);
-                            if (!isFinite(total) || (!progress.segmented && total < CONFIG.progressBadgeMinBytes)) return;
+                            if (!isFinite(total) || total <= 0) {
+                                setTaskProgress(task, '…', 'Lade ' + (i + 1) + '/' + items.length + ' …');
+                                return;
+                            }
+                            if (!progress.segmented && total < CONFIG.progressBadgeMinBytes) {
+                                hideTaskProgress(task);
+                                return;
+                            }
                             // Tampermonkey liefert { done, total } (Bytes) — percent
                             // existiert dort nicht, wird aber unterstützt, falls ein
                             // anderer Manager ihn liefert. done kann fehlen oder NaN
@@ -2476,8 +2913,8 @@
                             }
                             if (typeof pct === 'number' && isFinite(pct)) {
                                 pct = Math.max(0, Math.min(100, Math.round(pct)));
-                                showProgress(btn, pct);
-                                btn.title = 'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%';
+                                setTaskProgress(task, pct,
+                                    'Lade ' + (i + 1) + '/' + items.length + ' … ' + pct + '%');
                             }
                         };
                         if (i === 0) {
@@ -2487,12 +2924,12 @@
                             if (!selectedFile && !selectedFilename) selectedFile = await selectDownloadFile(filename);
                         }
                         if (items[i].broadcastId) {
-                            var broadcastUrl = await broadcastPlaybackUrl(items[i].broadcastId);
+                            var broadcastUrl = await broadcastPlaybackUrl(items[i].broadcastId, task.signal);
                             var broadcastFile = (i === 0 && selectedFile) ? selectedFile : await selectDownloadFile(filename);
                             if (!broadcastFile) throw new Error('Broadcast: Dateiauswahl erforderlich (erneut klicken)');
                             var manifest = await hlsResolve(broadcastUrl, task.signal);
                             if (!manifest.transportStream) throw new Error('Broadcast: Replay ist kein MPEG-TS (MP4-Ausgabe noch nicht unterstuetzt)');
-                            await downloadHlsFile(broadcastUrl, broadcastFile, reportProgress, task.signal);
+                            await downloadHlsFile(broadcastUrl, broadcastFile, reportProgress, task.signal, 'ts');
                         } else if (hlsUrl(items[i].url)) {
                             if (items[i].broadcast) {
                                 var broadcastManifest = await hlsResolve(items[i].url, task.signal);
@@ -2501,8 +2938,12 @@
                             // Große HLS-Dateien müssen auf die gewählte Datei gestreamt
                             // werden; GM_download würde nur eine Text-Playlist speichern.
                             var hlsFile = (i === 0 && selectedFile) ? selectedFile : await selectDownloadFile(filename);
-                            if (!hlsFile) throw new Error('HLS benötigt eine Browser-Dateiauswahl (Chrome/Edge/Yandex)');
-                            await downloadHlsFile(items[i].url, hlsFile, reportProgress, task.signal);
+                            if (!hlsFile) {
+                                var pickerError = new Error('HLS-Dateiauswahl benötigt einen neuen Klick; erneut klicken');
+                                pickerError.code = 'HLS_PICKER_REQUIRED';
+                                throw pickerError;
+                            }
+                            await downloadHlsFile(items[i].url, hlsFile, reportProgress, task.signal, items[i].ext);
                         } else if (i === 0 && selectedFile) {
                             await downloadSelectedFile(items[i].url, selectedFile, reportProgress, task.signal);
                         } else {
@@ -2515,6 +2956,11 @@
                         failed++;
                         if (!firstFailure) firstFailure = (err && err.message) || 'unbekannter Fehler';
                         log.error('Download fehlgeschlagen: ' + ((err && err.message) || 'unbekannter Fehler'));
+                        if (err && (err.code === 'HLS_CONTAINER_MISMATCH' || err.code === 'HLS_PICKER_REQUIRED')) {
+                            retryItems = items.slice(i).map(function (item) { return Object.assign({}, item); });
+                            if (err.code === 'HLS_CONTAINER_MISMATCH') retryItems[0].ext = err.actualExt;
+                            break;
+                        }
                     }
                 }
 
@@ -2522,8 +2968,10 @@
                 // lädt die Medien frisch (Live-Fallback). Zusätzlich prefetchSeen
                 // leeren, damit der Tweet beim nächsten Erscheinen wieder im
                 // Hintergrund vorgeladen werden kann (Cache füllen).
-                mediaCache.delete(tweetId);
+                if (retryItems && retryItems.length) setCachedItems(tweetId, retryItems);
+                else mediaCache.delete(tweetId);
                 prefetchSeen.delete(tweetId);
+                prefetchSeenAt.delete(tweetId);
 
                 if (failed > 0) {
                     errorMessage = failed + ' von ' + items.length + ' fehlgeschlagen: ' + firstFailure;
@@ -2535,11 +2983,14 @@
             log.error('Download-Ablauf fehlgeschlagen (Tweet ' + tweetId + '): ' + (err && err.message ? err.message : err));
         } finally {
             closeCancelPopup(task);
-            runningDownloads.delete(btn);
-            hideProgress(btn);
-            setBusy(btn, false);
+            if (runningDownloadsByTweet.get(tweetId) === task) runningDownloadsByTweet.delete(tweetId);
+            for (var taskButtonIndex = 0; taskButtonIndex < task.buttons.length; taskButtonIndex++) {
+                runningDownloads.delete(task.buttons[taskButtonIndex]);
+                hideProgress(task.buttons[taskButtonIndex]);
+                setBusy(task.buttons[taskButtonIndex], false);
+            }
         }
-        if (errorMessage) flashError(btn, errorMessage);
+        if (errorMessage) flashError(task.btn || btn, errorMessage);
     }
 
     // ============================ Button-Injektion =========================
@@ -2592,6 +3043,8 @@
         });
 
         actionBar.appendChild(clone);
+        var activeTask = runningDownloadsByTweet.get(getTweetId(tweet));
+        if (activeTask) bindRunningDownloadButton(activeTask, btn);
         return btn;
     }
 
@@ -2628,13 +3081,22 @@
      * Inhalt dauerhaft halten (wachsender Speicher in langen Sitzungen).
      */
     function releaseDetachedTweets(nodes) {
-        if (!prefetchObserver) return;
         for (var i = 0; i < nodes.length; i++) {
             var node = nodes[i];
-            if (node.matches && node.matches(CONFIG.tweetSelector)) prefetchObserver.unobserve(node);
+            if (prefetchObserver && node.matches && node.matches(CONFIG.tweetSelector)) prefetchObserver.unobserve(node);
+            var detachedButtons = [];
+            if (node.matches && node.matches('button[' + CONFIG.btnAttribute + ']')) detachedButtons.push(node);
             if (node.querySelectorAll) {
                 var nested = node.querySelectorAll(CONFIG.tweetSelector);
-                for (var j = 0; j < nested.length; j++) prefetchObserver.unobserve(nested[j]);
+                if (prefetchObserver) {
+                    for (var j = 0; j < nested.length; j++) prefetchObserver.unobserve(nested[j]);
+                }
+                var nestedButtons = node.querySelectorAll('button[' + CONFIG.btnAttribute + ']');
+                for (var b = 0; b < nestedButtons.length; b++) detachedButtons.push(nestedButtons[b]);
+            }
+            for (var d = 0; d < detachedButtons.length; d++) {
+                var task = runningDownloads.get(detachedButtons[d]);
+                if (task) detachRunningDownloadButton(task, detachedButtons[d], false);
             }
         }
     }
@@ -2660,7 +3122,24 @@
 
     function processTweet(tweet) {
         if (!tweet || !tweet.isConnected) return;
-        if (tweet.querySelector('button[' + CONFIG.btnAttribute + ']')) return;
+        var existingButton = tweet.querySelector('button[' + CONFIG.btnAttribute + ']');
+        if (existingButton) {
+            // X recycelt häufig nur Teile eines Tweets: Der xLoader-Button
+            // bleibt dabei erhalten, sein Badge-Wrapper kann aber neu aufgebaut
+            // werden. Den laufenden Zustand deshalb auch in diesem Pfad erneut
+            // anwenden statt die Verarbeitung sofort zu beenden.
+            var currentTweetId = getTweetId(tweet);
+            var mappedTask = runningDownloads.get(existingButton);
+            if (mappedTask && mappedTask.tweetId !== currentTweetId) {
+                // X kann denselben Artikel/Knopf für einen anderen Timeline-
+                // Eintrag wiederverwenden. Niemals den alten Task dort zeigen
+                // oder einen Klick als Abbruch des falschen Downloads behandeln.
+                detachRunningDownloadButton(mappedTask, existingButton, true);
+            }
+            var existingTask = runningDownloadsByTweet.get(currentTweetId);
+            if (existingTask) bindRunningDownloadButton(existingTask, existingButton);
+            return;
+        }
 
         if (hasMediaIndicator(tweet)) {
             var btn = createButton(tweet);
@@ -2736,13 +3215,21 @@
                 for (var k = 0; k < gone.length; k++) {
                     if (gone[k].nodeType === Node.ELEMENT_NODE) removed.push(gone[k]);
                 }
+                // Bei einem teilweisen X-Re-Render kann ausschließlich das
+                // Fortschritts-Badge entfernt werden. mutation.target liegt
+                // weiterhin im Tweet und muss dann die Wiederanbindung auslösen.
+                if (gone.length && mutations[i].target && mutations[i].target.nodeType === Node.ELEMENT_NODE) {
+                    var changedTweet = mutations[i].target.closest ?
+                        mutations[i].target.closest(CONFIG.tweetSelector) : null;
+                    if (changedTweet) nodes.push(changedTweet);
+                }
             }
             if (nodes.length) scheduleProcess(nodes);
             if (removed.length) releaseDetachedTweets(removed);
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.33 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.39-dev aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

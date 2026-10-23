@@ -11,18 +11,26 @@ const vm=require('node:vm');
 const crypto=require('node:crypto');
 const source=require('node:fs').readFileSync(path.join(__dirname,'../xLoader.user.js'),'utf8');
 const functions=source.slice(source.indexOf('async function selectDownloadFile('),source.indexOf('function downloadUrl('));
-const click=source.slice(source.indexOf('async function onDownloadClick('),source.indexOf('// ============================ Button-Injektion'));
+const click=source.slice(source.indexOf('function pruneTaskButtons('),source.indexOf('function normBase('))+
+ source.slice(source.indexOf('async function onDownloadClick('),source.indexOf('// ============================ Button-Injektion'));
 function fixture(){
  const state={events:[],chunks:[],closed:0,aborted:0,progress:[],timers:new Map(),requests:0};let id=0;
+ const media=new Uint8Array([0,0,0,12,102,116,121,112,105,115,111,109]);
  const file={async createWritable(){state.events.push('writable');return {async write(b){state.chunks.push(Buffer.from(b))},async close(){state.closed++},async abort(){state.aborted++}}}};
  const win={async showSaveFilePicker(o){assert.equal(this,win);state.events.push('picker');state.suggested=o.suggestedName;return file}};
- const context={window:{showSaveFilePicker:win.showSaveFilePicker},document:{defaultView:win},navigator:{userActivation:{isActive:true}},log:{info(){},warn(){},error(){}},setTimeout(fn){state.timers.set(++id,fn);return id},clearTimeout(id){state.timers.delete(id)}};
- context.GM_xmlhttpRequest=o=>{assert.equal('timeout' in o,false);assert.equal(typeof o.onloadend,'function');state.requests++;queueMicrotask(()=>{o.onloadstart({status:0,readyState:1,responseHeaders:'',response:new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3]));c.close()}})});const final={status:200,readyState:4,responseHeaders:'Content-Length: 3'};o.onreadystatechange(final);o.onload(final)});return {abort(){state.events.push('abort')}}};
- vm.createContext(context);vm.runInContext(functions,context);return {context,state,file};
+ const context={URL,AbortController,window:{showSaveFilePicker:win.showSaveFilePicker},document:{defaultView:win},navigator:{userActivation:{isActive:true}},log:{info(){},warn(){},error(){}},setTimeout(fn){state.timers.set(++id,fn);return id},clearTimeout(id){state.timers.delete(id)},
+  isMediaUrl(){return true},hlsUrl(){return false},allowedImageUrl(){return true},responseHeader(headers,name){const m=new RegExp('(?:^|\\r?\\n)'+name+':\\s*([^\\r\\n]+)','i').exec(headers||'');return m?m[1].trim():''},
+  assertFullHttpResponse(status){if(status!==200)throw Error('Download HTTP '+status)},assertMediaContentType(){},
+  ensureNotCancelled(signal){if(signal&&signal.aborted){const e=Error('Download abgebrochen');e.name='AbortError';throw e}},
+  downloadAbortError(){const e=Error('Download abgebrochen');e.name='AbortError';return e},
+  isCancellation(e,signal){return !!(signal&&signal.aborted)||!!(e&&e.name==='AbortError')},
+  onDownloadAbort(signal,fn){if(!signal)return()=>{};signal.addEventListener('abort',fn,{once:true});return()=>signal.removeEventListener('abort',fn)}};
+ context.GM_xmlhttpRequest=o=>{assert.equal('timeout' in o,false);assert.equal(typeof o.onloadend,'function');state.requests++;queueMicrotask(()=>{o.onloadstart({status:0,readyState:1,responseHeaders:'',response:new ReadableStream({start(c){c.enqueue(media);c.close()}})});const final={status:200,readyState:4,responseHeaders:'Content-Length: '+media.length};o.onreadystatechange(final);o.onload(final)});return {abort(){state.events.push('abort')}}};
+ vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function allowedImageUrl('),source.indexOf('function hlsUrl(')),context);vm.runInContext(source.slice(source.indexOf('function isProgressiveVideoUrl('),source.indexOf('function isMediaUrl(')),context);vm.runInContext(functions,context);return {context,state,file,media};
 }
 function clickFixture({cached=true,all=false,picker=true,cancel=false,mergeError=false,pending=false}={}){
  const f=fixture(),{context:c,state:s,file}=f;let accept;
- Object.assign(c,{saveAsMode:all?'all':'first',CONFIG:{progressBadgeMinBytes:5e6},setBusy(b,v){b.disabled=v},getTweetId(){return '123'},getHandle(){return 'author'},sanitizeFilenamePart(v){return v},formatFilename(t,d){return '@'+d.handle+'_'+d.id+'_'+d.index+'.'+d.ext},getFilenameTemplate(){return ''},getCachedItems(){return cached?[{url:'first',ext:'mp4'}]:null},mediaCache:new Map(),prefetchSeen:new Set(),async loadItemsLive(){s.events.push('metadata');return {items:[{url:'first',ext:'mp4'}]}},async mergeDomItems(t,items){s.events.push('merge');if(mergeError)throw Error('merge');return [...items,{url:'second',ext:'png'}]},async downloadUrl(url,name,saveAs){s.events.push({legacy:true,url,name,saveAs})},hideProgress(){},showProgress(){},flashError(){s.error=true}});
+ Object.assign(c,{isMediaUrl(){return true},hlsUrl(){return false},renderedTweetMedia(){return []},broadcastFromDom(){return null},saveAsMode:all?'all':'first',CONFIG:{progressBadgeMinBytes:5e6},runningDownloads:new WeakMap(),runningDownloadsByTweet:new Map(),showCancelPopup(){},closeCancelPopup(){},setBusy(b,v){b.disabled=v},getTweetId(){return '123'},getHandle(){return 'author'},sanitizeFilenamePart(v){return v},formatFilename(t,d){return '@'+d.handle+'_'+d.id+'_'+d.index+'.'+d.ext},getFilenameTemplate(){return ''},getCachedItems(){return cached?[{url:'first',ext:'mp4'}]:null},mediaCache:new Map(),prefetchSeen:new Set(),prefetchSeenAt:new Map(),setCachedItems(){},async loadItemsLive(){s.events.push('metadata');return {items:[{url:'first',ext:'mp4'}]}},async mergeDomItems(t,items){s.events.push('merge');if(mergeError)throw Error('merge');return [...items,{url:'second',ext:'png'}]},async downloadUrl(url,name,saveAs,onProgress){s.events.push({legacy:true,url,name,saveAs});if(c.__progressEvent&&onProgress)onProgress(c.__progressEvent)},hideProgress(){s.progress.push('hidden')},showProgress(b,value){s.progress.push(value)},flashError(b,msg){s.error=true;s.errorMessage=msg}});
  c.selectDownloadFile=async name=>{s.events.push('picker');if(cancel){const e=Error();e.name='AbortError';throw e}if(pending)return new Promise(r=>accept=r);return picker?file:null};
  c.downloadSelectedFile=async(url,handle)=>{assert.equal(handle,file);s.events.push({selected:true,url})};
  vm.runInContext(click,c);return {...f,accept:()=>accept(file)};
@@ -32,11 +40,11 @@ test('missing File System Access API uses legacy fallback',async()=>{const f=fix
 test('expired activation uses legacy fallback',async()=>{const f=fixture();f.context.navigator.userActivation.isActive=false;assert.equal(await f.context.selectDownloadFile('a'),null);assert.equal(f.state.events.length,0)});
 for(const name of ['SecurityError','NotSupportedError','TypeError'])test(name+' uses legacy fallback',async()=>{const f=fixture();f.context.window.showSaveFilePicker=()=>{const e=Error();e.name=name;throw e};assert.equal(await f.context.selectDownloadFile('a'),null)});
 test('picker cancellation is not retried as legacy download',async()=>{const f=clickFixture({cancel:true}),btn={};await f.context.onDownloadClick({},btn);assert.deepEqual(f.state.events,['picker']);assert.equal(btn.disabled,false)});
-test('stream writes exact bytes, reports progress, closes once, clears timer',async()=>{const f=fixture();await f.context.downloadSelectedFile('u',f.file,p=>f.state.progress.push(p));assert.deepEqual(Buffer.concat(f.state.chunks),Buffer.from([1,2,3]));assert.equal(f.state.closed,1);assert.equal(f.state.progress[0].done,3);assert.equal(f.state.progress[0].total,3);assert.equal(f.state.timers.size,0)});
+test('stream writes exact bytes, reports progress, closes once, clears timer',async()=>{const f=fixture();await f.context.downloadSelectedFile('u',f.file,p=>f.state.progress.push(p));assert.deepEqual(Buffer.concat(f.state.chunks),Buffer.from(f.media));assert.equal(f.state.closed,1);assert.equal(f.state.progress[0].done,f.media.length);assert.equal(f.state.progress[0].total,f.media.length);assert.equal(f.state.timers.size,0)});
 
 test('stream end waits for final HTTP status before committing',async()=>{
  const f=fixture();let finish;
- f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{o.onloadstart({status:0,response:new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3]));c.close()}})});finish=()=>o.onload({status:200,responseHeaders:'Content-Length: 3'})});return {abort(){}}};
+ f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{o.onloadstart({status:0,response:new ReadableStream({start(c){c.enqueue(f.media);c.close()}})});finish=()=>o.onload({status:200,responseHeaders:'Content-Length: '+f.media.length})});return {abort(){}}};
  const pending=f.context.downloadSelectedFile('u',f.file);
  await new Promise(r=>setImmediate(r));assert.equal(f.state.closed,0);
  finish();await pending;assert.equal(f.state.closed,1);
@@ -54,11 +62,11 @@ test('empty successful media stream is not committed',async()=>{
  await assert.rejects(f.context.downloadSelectedFile('u',f.file),/unvollständig/);assert.equal(f.state.closed,0);assert.equal(f.state.aborted,1);
 });
 test('Tampermonkey closes the stream only when loadend was requested',async()=>{
- const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{let control;const response=new ReadableStream({start(c){control=c;c.enqueue(new Uint8Array([1,2,3]))}});o.onloadstart({status:0,response});o.onload({status:200,responseHeaders:'Content-Length: 3'});assert.equal(typeof o.onloadend,'function');control.close();o.onloadend({status:200})});return {abort(){}}};
- await f.context.downloadSelectedFile('u',f.file);assert.equal(f.state.closed,1);assert.equal(Buffer.concat(f.state.chunks).length,3);
+ const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{let control;const response=new ReadableStream({start(c){control=c;c.enqueue(f.media)}});o.onloadstart({status:0,response});o.onload({status:200,responseHeaders:'Content-Length: '+f.media.length});assert.equal(typeof o.onloadend,'function');control.close();o.onloadend({status:200})});return {abort(){}}};
+ await f.context.downloadSelectedFile('u',f.file);assert.equal(f.state.closed,1);assert.equal(Buffer.concat(f.state.chunks).length,f.media.length);
 });
 test('HTTP failure does not open writable or overwrite file',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>o.onloadstart({status:403}));return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/HTTP 403/);assert.equal(f.state.events.includes('writable'),false);assert.equal(f.state.timers.size,0)});
-test('truncated body aborts without committing',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{const res={status:200,responseHeaders:'Content-Length: 4',response:new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3]));c.close()}})};o.onloadstart(res);o.onload(res)});return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/unvollständig/);assert.equal(f.state.closed,0);assert.equal(f.state.aborted,1)});
+test('truncated body aborts without committing',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{const res={status:200,responseHeaders:'Content-Length: '+(f.media.length+1),response:new ReadableStream({start(c){c.enqueue(f.media);c.close()}})};o.onloadstart(res);o.onload(res)});return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/unvollständig/);assert.equal(f.state.closed,0);assert.equal(f.state.aborted,1)});
 test('network error clears watchdog',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>o.onerror());return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/Netzwerk/);assert.equal(f.state.timers.size,0)});
 test('unsupported GM stream fails visibly without committing',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>o.onloadstart({status:200,response:{}}));return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/keinen Download-Stream/);assert.equal(f.state.closed,0)});
 test('watchdog aborts a stalled request',async()=>{const f=fixture();let aborts=0;f.context.GM_xmlhttpRequest=()=>({abort(){aborts++}});const p=f.context.downloadSelectedFile('u',f.file);const rejected=assert.rejects(p,/Timeout/);[...f.state.timers.values()][0]();await rejected;assert.equal(aborts,1);assert.equal(f.state.timers.size,0)});
@@ -69,20 +77,33 @@ test('all mode keeps legacy saveAs for subsequent media',async()=>{const f=click
 test('cache miss resolves metadata before choosing file',async()=>{const f=clickFixture({cached:false});await f.context.onDownloadClick({},{});assert.deepEqual(f.state.events.slice(0,3),['metadata','picker','merge'])});
 test('double click while picker pending opens one picker',async()=>{const f=clickFixture({pending:true}),b={};const p=f.context.onDownloadClick({},b);await f.context.onDownloadClick({},b);assert.equal(f.state.events.filter(e=>e==='picker').length,1);f.accept();await p;assert.equal(b.disabled,false)});
 test('legacy fallback downloads all media',async()=>{const f=clickFixture({picker:false});await f.context.onDownloadClick({},{});assert.equal(f.state.events.filter(e=>e.legacy).length,2)});
+test('legacy video shows indeterminate progress when GM_download reports no total',async()=>{const f=clickFixture({picker:false});f.context.__progressEvent={done:1024,total:0};await f.context.onDownloadClick({},{});assert.equal(f.state.progress.includes('…'),true);assert.equal(f.state.progress.some(v=>String(v).includes('NaN')),false)});
+test('legacy large video switches from indeterminate state to percentage',async()=>{const f=clickFixture({picker:false});f.context.__progressEvent={done:25e6,total:50e6};await f.context.onDownloadClick({},{});assert.equal(f.state.progress.includes('…'),true);assert.equal(f.state.progress.includes(50),true)});
+test('replacement button restores running tweet progress after DOM recycling',()=>{const f=clickFixture(),oldBtn={isConnected:false},newBtn={isConnected:true};const task={signal:new AbortController().signal,btn:oldBtn,buttons:[oldBtn],progressVisible:true,progressValue:63,statusTitle:'Lade 1/1 … 63%'};f.context.bindRunningDownloadButton(task,newBtn);assert.equal(f.context.runningDownloads.get(newBtn),task);assert.equal(task.btn,newBtn);assert.equal(newBtn.disabled,true);assert.equal(newBtn.title,'Lade 1/1 … 63%');assert.equal(f.state.progress.at(-1),63)});
+test('rebinding prunes detached buttons and their stale WeakMap entries',()=>{const f=clickFixture(),oldBtn={isConnected:false},newBtn={isConnected:true};const task={signal:new AbortController().signal,btn:oldBtn,buttons:[oldBtn],progressVisible:true,progressValue:41,statusTitle:'41%'};f.context.runningDownloads.set(oldBtn,task);f.context.bindRunningDownloadButton(task,newBtn);assert.equal(f.context.runningDownloads.has(oldBtn),false);assert.equal(task.buttons.length,1);assert.equal(task.buttons[0],newBtn);assert.equal(f.context.runningDownloads.get(newBtn),task)});
+test('progress is mirrored to every connected representation of one tweet',()=>{const f=clickFixture(),a={isConnected:true},b={isConnected:true};const task={signal:new AbortController().signal,btn:b,buttons:[a,b]};f.context.setTaskProgress(task,77,'77%');assert.deepEqual(f.state.progress.slice(-2),[77,77]);assert.equal(a.title,'77%');assert.equal(b.title,'77%')});
+test('expired second HLS picker caches remainder and resumes on next click',async()=>{
+ const f=clickFixture(),items=[{url:'https://video.twimg.com/x/1.m3u8',ext:'mp4'},{url:'https://video.twimg.com/x/2.m3u8',ext:'mp4'}];let cache=items,picks=0;
+ f.context.getCachedItems=()=>cache;f.context.mergeDomItems=async(t,v)=>v;f.context.hlsUrl=()=>true;
+ f.context.downloadHlsFile=async url=>f.state.events.push({hls:url});
+ f.context.setCachedItems=(id,v)=>{cache=v};f.context.selectDownloadFile=async()=>++picks===2?null:f.file;
+ await f.context.onDownloadClick({},{});assert.equal(f.state.events.filter(e=>e.hls).length,1);assert.equal(cache.length,1);assert.equal(cache[0].url,items[1].url);
+ await f.context.onDownloadClick({},{});assert.equal(f.state.events.filter(e=>e.hls).length,2);assert.equal(f.state.events.filter(e=>e.hls)[1].hls,items[1].url)
+});
 test('reported two-video tweet keeps both highest-quality MP4s and downloads both',async()=>{
  const f=clickFixture();const data=require('./fixtures/two-videos-2111770022419075168.json');
  vm.runInContext(source.slice(source.indexOf('function collectTweetObjects('),source.indexOf('function fetchLiveBearerToken(')),f.context);
  const items=f.context.parseApiData(data,data.id_str).media;assert.equal(items.length,2);
  assert.match(items[0].url,/2160x3840/);assert.match(items[1].url,/480x852/);
- f.context.getCachedItems=()=>items;f.context.mergeDomItems=async(t,v)=>v;
- await f.context.onDownloadClick({},{});
+ f.context.isMediaUrl=()=>true;f.context.renderedTweetMedia=()=>[];f.context.getCachedItems=()=>items;f.context.mergeDomItems=async(t,v)=>v;
+ await f.context.onDownloadClick({querySelectorAll(){return[]}},{});
  const downloads=f.state.events.filter(e=>e.selected||e.legacy);
- assert.equal(downloads.length,2);assert.equal(downloads[0].url,items[0].url);assert.equal(downloads[1].url,items[1].url);assert.match(downloads[1].name,/_2\.mp4$/);
+ assert.equal(downloads.length,2,f.state.errorMessage);assert.equal(downloads[0].url,items[0].url);assert.equal(downloads[1].url,items[1].url);assert.match(downloads[1].name,/_2\.mp4$/);
 });
 test('merge error releases button and starts no transfer',async()=>{const f=clickFixture({mergeError:true}),b={};await f.context.onDownloadClick({},b);assert.equal(b.disabled,false);assert.equal(f.state.events.some(e=>e.selected||e.legacy),false);assert.equal(f.state.error,true)});
 test('real HTTP stream completes with matching disk bytes and SHA-256',async()=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'xloader-stream-'));
- const bytes=Buffer.alloc(512*1024);for(let i=0;i<bytes.length;i++)bytes[i]=i%251;
+ const bytes=Buffer.alloc(512*1024);for(let i=0;i<bytes.length;i++)bytes[i]=i%251;Buffer.from([0,0,0,12,102,116,121,112,105,115,111,109]).copy(bytes,0);
  const server=http.createServer((req,res)=>{res.writeHead(200,{'Content-Length':bytes.length,'Content-Type':'video/mp4'});res.end(bytes)});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const f=fixture();

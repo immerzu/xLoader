@@ -10,6 +10,12 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [Arbeitsjournal](JOURNAL.jsonl) – kurze chronologische Arbeitsnotizen und wichtige Sitzungsereignisse
 - [Browser-Neustartfehler und verbindliche Lösung](BROWSER_STARTUP_2026-10-21.md) – **Pflichtlektüre vor Browserarbeiten**: persistentes Profil, dauerhafte Tampermonkey-Installation, Herkunftssperre 12, gültige Startpfade und Neustart-Abnahme. Ersetzt ältere Empfehlungen, Tampermonkey per `--load-extension` zu starten.
 - [HANDOVER v1.0.33](HANDOVER_v1.0.33.md) – aktueller Quell-/Release-Stand: Agent-A-Freigabe, HLS und Abbruch, Integritätsnachweise.
+- [HANDOVER v1.0.39-dev](HANDOVER_v1.0.39-dev.md) – aktueller lokaler Arbeitsstand: gehärtete Fortschrittsbindung bei DOM-Recycling; nicht veröffentlicht.
+- [HANDOVER v1.0.38-dev](HANDOVER_v1.0.38-dev.md) – historischer lokaler Badge-Fix; durch v1.0.39-dev gehärtet.
+- [HANDOVER v1.0.37-dev](HANDOVER_v1.0.37-dev.md) – historischer lokaler Fix für vollständigen Buttonersatz; durch v1.0.38-dev erweitert.
+- [HANDOVER v1.0.36-dev](HANDOVER_v1.0.36-dev.md) – historischer lokaler Fortschrittsfix ohne verwertbares GM_download-total; durch v1.0.37-dev fortgeführt.
+- [HANDOVER v1.0.35-dev](HANDOVER_v1.0.35-dev.md) – historischer lokaler Fix für verschachtelte Quoted-Videos und falsche JPG-Poster; durch v1.0.36-dev fortgeführt.
+- [HANDOVER v1.0.34-dev](HANDOVER_v1.0.34-dev.md) – historischer lokaler Härtungsstand H1–H7; durch v1.0.35-dev fortgeführt.
 - [HANDOVER v1.0.28](HANDOVER_v1.0.28.md) – historische lokale Testfassung; 903-Byte-Initsegment-Bug, Nachweise und Grenzen; nicht veröffentlicht.
 - [HANDOVER v1.0.26](HANDOVER_v1.0.26.md) – historischer Release-Stand: bestätigter Windows-Test, unveränderte Freigabedatei und Veröffentlichung.
 - [HANDOVER v1.0.25](HANDOVER_v1.0.25.md) – historischer lokaler Zwischenstand mit Streamingdiagnose; durch v1.0.26 abgelöst.
@@ -19,7 +25,7 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – historischer Snapshot nach dem Projektumzug.
 - [Bestandsaufnahme und offene Bereinigungskandidaten](CLEANUP_2026-10-21.md) – lokale Profile, Archive und Werkzeugdaten; keine Löschfreigabe.
 
-Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.33. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
+Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.39-dev. Release-Nachweise bleiben im Handover v1.0.33. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
 
 ## Pflege-Regeln
 
