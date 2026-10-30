@@ -20,4 +20,20 @@ Stand: 2026-10-30. Vom Nutzer unter Windows/Tampermonkey bestätigt und zur Ver�
 
 ## Veröffentlichung
 
-Die endgültigen Commit-, Tag-, GitHub-Asset- und Greasy-Fork-Nachweise werden nach der tatsächlichen Kontrolle beider Dienste ergänzt. Das Browserprofil wird für die Veröffentlichung nicht verändert.
+Am 2026-10-30 veröffentlicht und anschließend gegen beide Dienste geprüft:
+
+- Commit `b6ba6b4e96355ba049465d5eea524f58559786c7` (lokaler HEAD = `origin/main`),
+  Tag `v1.0.42` = `549601349e50003625e970169ba3e43df9bf048b` (zeigt auf denselben Commit).
+- GitHub-Release <https://github.com/immerzu/xLoader/releases/tag/v1.0.42> mit Asset
+  `xLoader-v1.0.42.user.js`, 176.465 Bytes, SHA-256
+  `FDA18B75C40A86F55BD41BBB01C1F874783E290520B60E5A94C58B31506F5E17`
+  (auch im GitHub-API-Asset-Digest bestätigt), identisch zur Quelle.
+- Greasy Fork 589456 liefert 1.0.42: Rohdatei 176.441 Bytes, nach Entfernung der
+  GF-eigenen `@updateURL`/`@downloadURL`-Zeilen inhaltlich identisch.
+- Prüfbelege lokal in `Ausgabe/verify-v1.0.42/`; das Browserprofil wurde für die
+  Veröffentlichung nicht verändert.
+
+Korrektur zur Nachweiszahl: Der Release-Text nennt 83 lokale Regressionstests.
+Eine Nachzählung am 2026-10-30 mit der Runner-Ausgabe ergibt für die sechs
+Testdateien 126 bestandene Subtests (11/16/39/23/18/19), 0 Fehler. Die Zahl 83
+war eine engere Zählung desselben Laufs; beide Läufe sind grün.

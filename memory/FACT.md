@@ -1,4 +1,4 @@
-# xLoader — FACT SHEET (Arbeitsstand und Releasevorbereitung: v1.0.42, 2026-10-30)
+# xLoader — FACT SHEET (Stand: v1.0.42 veröffentlicht, 2026-10-30)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
@@ -7,7 +7,7 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, lokal `@version 1.0.39`). Enthält Härtung, Quoted-Video-Fix sowie gehärteten Videofortschritt nach Timeline-DOM-Recycling.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.42`). Enthält Härtung, Quoted-Video-Fix, gehärteten Videofortschritt nach Timeline-DOM-Recycling sowie den Syndication-Fallback für die Medienauflösung.
 - **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -15,11 +15,11 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Auto-Update im Skript:** `@updateURL`/`@downloadURL` = raw GitHub `main`.
 - **Install-Link:** `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js` (Tampermonkey bietet Installation an).
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
-- **Aktueller freigegebener Arbeitsstand:** v1.0.42. Die Veröffentlichung wird erst nach Kontrolle von GitHub-Asset und Greasy-Fork-Auslieferung als vollständig verifiziert geführt. Aktueller Einstieg: `HANDOVER_v1.0.42.md`.
+- **Aktueller freigegebener Arbeitsstand:** v1.0.42, veröffentlicht und inhaltlich geprüft (GitHub-Release mit Asset, Greasy-Fork-Auslieferung 1.0.42, Abweichung nur die GF-eigenen URL-Zeilen). Aktueller Einstieg: `HANDOVER_v1.0.42.md`.
 
 ## Aktueller Arbeits- und Release-Stand (v1.0.42)
 
-- **v1.0.42, 2026-10-30:** Öffentliche Tweet-Medien über einen ansichtsunabhängigen Syndication-Fallback auflösen; veraltete Timeline-Videoquellen nach der frühen Dateiauswahl erneuern; laufende Player/Performance-Quellen erhalten und fehlende direkte Gesamtgrößen für Prozentfortschritt per HEAD ergänzen. 83 lokale Subtests erfolgreich. Nutzer bestätigte die Korrektur unter Windows/Tampermonkey und gab die Veröffentlichung frei. Details: `HANDOVER_v1.0.42.md`.
+- **v1.0.42, 2026-10-30:** Öffentliche Tweet-Medien über einen ansichtsunabhängigen Syndication-Fallback auflösen; veraltete Timeline-Videoquellen nach der frühen Dateiauswahl erneuern; laufende Player/Performance-Quellen erhalten und fehlende direkte Gesamtgrößen für Prozentfortschritt per HEAD ergänzen. Nutzer bestätigte die Korrektur unter Windows/Tampermonkey und gab die Veröffentlichung frei. Veröffentlicht: Commit `b6ba6b4`, Tag `v1.0.42`, GitHub-Release mit Asset 176.465 Bytes / SHA-256 `FDA18B75…5E17`; Greasy Fork liefert 1.0.42 (176.441 Bytes) und ist nach Entfernung der GF-eigenen `@updateURL`/`@downloadURL`-Zeilen inhaltlich identisch. Details: `HANDOVER_v1.0.42.md`.
 
 - **v1.0.39, 2026-10-23:** Downloadintegrität, HLS, Abbruch, Medienauswahl und DOM-Wiederanbindung gehärtet. Ein von X für einen anderen Tweet recycelter Button wird vom alten Task getrennt; entfernte Buttons werden bereinigt; mehrere Darstellungen erhalten synchron denselben Fortschritt. Syntax und 75 lokale Subtests erfolgreich. Nutzer bestätigte Fortschrittsanzeige sowie vollständige Mehrfachmedien-Downloads unter Windows/Tampermonkey. GitHub und Greasy Fork veröffentlicht und inhaltlich geprüft. Details: `HANDOVER_v1.0.39.md`.
 - **v1.0.38-dev, 2026-10-23:** Bereits vorhandene xLoader-Buttons werden nach DOM-Änderungen wieder an laufende Tweet-Tasks gebunden. Der Observer berücksichtigt auch reine Entfernungen innerhalb eines Tweets, sodass ein von X entferntes Badge wiederhergestellt wird. Syntax und 73 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.38-dev.md`.
@@ -154,13 +154,13 @@ dokumentiert; der reguläre Ablauf benötigt keine Skriptinstallation im Browser
 | Pfad | Zweck |
 |------|-------|
 | `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.42; Metablock + Changelog oben |
-| `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.user.js`, ältere `.js` (gitignored) |
+| `F:\001_Coding_Projekte\xLoader\Ausgabe\` | aktuelle Archive `xLoader-v1.0.X.user.js`; `!old/` mit älteren `.js`-Archiven und Sicherungen (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |
 | `F:\001_Coding_Projekte\xLoader\ru-board_xloader_post.md` | historischer Ru.Board-Entwurf v1.0.24; Ziel-/Kontodaten vor Verwendung prüfen |
 | `F:\001_Coding_Projekte\xLoader\memory\` | Projektgedächtnis (dieses Verzeichnis) |
 | `F:\001_Coding_Projekte\xLoader\.reasonix\skills\greasy-fork-release\SKILL.md` | lokales Release-Playbook (Spiegel in `!Wichtiges\Meine _Skills\projekt_weit\xLoader\`) |
-| `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` | optionaler DOM-Regressionstest (außerhalb Repo, lokal) |
+| `node /c/Users/lolo/dh-test/xloader/dom-media-test.js xLoader.user.js` | älterer lokaler DOM-Test außerhalb des Repos (Stand v1.0.24); maßgeblich ist `tests/` im Repo |
 
 
 ## Lokale Bereinigung
@@ -178,6 +178,10 @@ unverändert; keine neue Dialogzeitmessung. Details: [HANDOVER v1.0.28](HANDOVER
 
 Analyse des v1.0.33-Quellstands und Umsetzung in v1.0.34-dev:
 [Befunde, Korrekturen und Nachweisgrenzen](HARDENING_2026-10-22.md).
-Die aktuelle Gesamtfassung ist lokal durch 83 Tests geprüft. Der Nutzer bestätigte
+Die aktuelle Gesamtfassung ist lokal geprüft: sechs Testdateien, 126 bestandene
+Subtests, 0 Fehler (Nachzählung 2026-10-30 mit Node.js 22.23.4; Aufschlüsselung
+siehe [README](../README.md#development--entwicklung--разработка)). Ältere
+Handovers nennen für ihren jeweiligen Stand andere Summen (75 bzw. 83) ohne
+Aufschlüsselung. Der Nutzer bestätigte
 die korrigierte Hauptansicht und Fortschrittsanzeige im Windows-/Tampermonkey-Betrieb
-und gab v1.0.42 zur Veröffentlichung frei.
+und gab v1.0.42 zur Veröffentlichung frei; die Veröffentlichung ist belegt.

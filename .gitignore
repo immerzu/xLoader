@@ -9,3 +9,6 @@ _tmp_*
 
 # Versionskopien (Ausgabe-Ordner, nie committen)
 Ausgabe/
+
+# Reasonix-Tool-Artefakte (lokal, nicht versionieren)
+.reasonix/

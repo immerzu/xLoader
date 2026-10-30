@@ -20,12 +20,13 @@
 - Doku: README DE/EN/RU, FACT, MEMORY, ru-board-Post; Changelog-Kopf.
 
 ## Release
-- Commit + Push `main`, Tag `v1.0.24`, GitHub-Release mit Userscript-Asset,
-  Greasy-Fork-Sync 589456 (`main/xLoader.user.js`).
+- Commit `e16a6cf` (main = origin/main), Tag `v1.0.24`.
+- GitHub-Release: https://github.com/immerzu/xLoader/releases/tag/v1.0.24 — Asset
+  `xLoader-v1.0.24.user.js`, 78.554 Bytes, SHA-256 `FAA9DFFB…`.
+- Greasy Fork 589456: v1.0.24, Rohdatei 78.530 Bytes, SHA-256 `9F776EF2…`;
+  Unterschied nur die GF-eigenen `@updateURL`/`@downloadURL`-Zeilen (bytegenau verifiziert).
 
 ## Offen / Einschränkungen
 - Echter x.com-Live-Test im portablen Chrome/Yandex: vom Nutzer bestätigt,
   nicht automatisiert nachgestellt.
 - FACT-Zeilenangaben: v1.0.23-Basis +15 durch den v1.0.24-Changelog-Block.
-- Diese Datei wird beim Release-Commit mitgeführt; das GF-Ergebnis steht im
-  abschließenden Bericht.

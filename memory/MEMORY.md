@@ -24,7 +24,7 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [HANDOVER v1.0.23 (vollständig)](HANDOVER_v1.0.23.md) – historischer kompletter Bericht (Architektur mit Zeilen v1.0.23, Datenflüsse, Tests, Release, Schwachstellen, Stand)
 
 - [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – historischer Snapshot nach dem Projektumzug.
-- [Bestandsaufnahme und offene Bereinigungskandidaten](CLEANUP_2026-10-21.md) – lokale Profile, Archive und Werkzeugdaten; keine Löschfreigabe.
+- [Bestandsaufnahme und offene Bereinigungskandidaten](CLEANUP_2026-10-21.md) – lokale Profile, Archive und Werkzeugdaten; zuletzt am 2026-10-30 auf den v1.0.42-Stand fortgeschrieben; keine Löschfreigabe.
 
 Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.42. Ältere Release-Nachweise bleiben in den historischen Handovers. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
 

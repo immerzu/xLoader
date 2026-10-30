@@ -175,17 +175,25 @@ Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v
 
 Published source / veröffentlichte Quelle: **v1.0.42**. It retains the v1.0.39 hardening and media support, refreshes stale timeline sources, resolves public tweet media independently of the current X view and restores percentage progress for large progressive videos; see [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md). Earlier test builds remain historical local archives.
 
-**English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins (checked with Node.js 22.23.2). Run the syntax check below from the project root. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
+**English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins and run per file from the project root — `node --test tests/` does not drive these harnesses. Last full run 2026-10-30 (Node.js 22.23.4): 126 passing subtests in six files, 0 failures. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
-**Deutsch 🇩🇪:** Arbeitsdatei ist [xLoader.user.js](xLoader.user.js); der Kommentar am Anfang enthält den maßgeblichen Changelog. Kein Kompilieren oder Installieren von npm-Abhängigkeiten nötig. Tests verwenden Node.js-Bordmittel (geprüft mit Node.js 22.23.2). Die folgende Syntaxprüfung im Projektstamm ausführen. Versionsarchive und Prüfnachweise gehören nach `Ausgabe/` (ignoriert). Release-Schritte benötigen ausdrückliche Freigabe; Ablauf in [FACT.md](memory/FACT.md).
+**Deutsch 🇩🇪:** Arbeitsdatei ist [xLoader.user.js](xLoader.user.js); der Kommentar am Anfang enthält den maßgeblichen Changelog. Kein Kompilieren oder Installieren von npm-Abhängigkeiten nötig. Tests verwenden Node.js-Bordmittel und werden im Projektstamm einzeln ausgeführt — `node --test tests/` startet diese Harnesses nicht. Letzter vollständiger Lauf 2026-10-30 (Node.js 22.23.4): 126 bestandene Subtests in sechs Dateien, 0 Fehler. Versionsarchive und Prüfnachweise gehören nach `Ausgabe/` (ignoriert). Release-Schritte benötigen ausdrückliche Freigabe; Ablauf in [FACT.md](memory/FACT.md).
 
-**Русский 🇷🇺:** Исходник — [xLoader.user.js](xLoader.user.js); основной журнал изменений находится в начальном комментарии. Компиляция и установка npm-зависимостей не нужны. Тесты используют встроенные модули Node.js (проверено с Node.js 22.23.2). Проверка синтаксиса ниже выполняется из корня проекта. Архивы и результаты проверок хранятся в игнорируемом `Ausgabe/`. Публикация требует явного разрешения; порядок — в [FACT.md](memory/FACT.md).
+**Русский 🇷🇺:** Исходник — [xLoader.user.js](xLoader.user.js); основной журнал изменений находится в начальном комментарии. Компиляция и установка npm-зависимостей не нужны. Тесты используют встроенные модули Node.js и запускаются пофайлово из корня проекта — `node --test tests/` эти harnesses не запускает. Последний полный прогон 2026-10-30 (Node.js 22.23.4): 126 успешных подтестов в шести файлах, 0 ошибок. Архивы и результаты проверок хранятся в игнорируемом `Ausgabe/`. Публикация требует явного разрешения; порядок — в [FACT.md](memory/FACT.md).
 
 ```powershell
 node --check xLoader.user.js
+node tests/dom-media.test.cjs
+node tests/fixes.test.cjs
+node tests/download-flow.test.cjs
+node tests/hardening.test.cjs
+node tests/progressive-media.test.cjs
+node tests/watchdog.test.cjs
 ```
 
-The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.42 passed 83 local tests; the user confirmed the corrected main-timeline download behavior and progress in their Windows/Tampermonkey browser. Publication evidence is recorded in [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md); earlier evidence remains in the historical handovers.
+Passing subtests per file (2026-10-30): dom-media 11, fixes 16, download-flow 39, hardening 23, progressive-media 18, watchdog 19.
+
+The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.42 passed the full local suite; the user confirmed the corrected main-timeline download behavior and progress in their Windows/Tampermonkey browser. Publication evidence is recorded in [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md); earlier evidence remains in the historical handovers.
 
 | Path / Pfad / Путь | Purpose / Zweck / Назначение |
 |---|---|
