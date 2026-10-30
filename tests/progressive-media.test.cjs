@@ -18,6 +18,13 @@ test('progressive modern, legacy and GIF URLs remain valid',()=>{
  assert.equal(ctx.isProgressiveVideoUrl('https://video.twimg.com.evil.test/vid/1280x720/full.mp4'),false);
 });
 const data=require('./fixtures/realamvoice-2112667113039011886.json');
+const tichysTimeline={id_str:'2116074797578772484',text:'timeline video',mediaDetails:[{type:'video',
+ media_url_https:'https://pbs.twimg.com/amplify_video_thumb/2116074265741049856/img/poster.jpg',
+ video_info:{variants:[
+  {content_type:'application/x-mpegURL',url:'https://video.twimg.com/amplify_video/2116074265741049856/pl/master.m3u8'},
+  {content_type:'video/mp4',bitrate:432000,url:'https://video.twimg.com/amplify_video/2116074265741049856/vid/avc1/320x320/low.mp4'},
+  {content_type:'video/mp4',bitrate:1280000,url:'https://video.twimg.com/amplify_video/2116074265741049856/vid/avc1/720x720/high.mp4'}
+ ]}}]};
 test('real reference API selects full 1080p MP4',()=>{
  const items=ctx.parseApiData(data,data.id_str).media;
  assert.equal(items.length,1);assert.match(items[0].url,/\/vid\/avc1\/1920x1080\/[^/]+\.mp4/);
@@ -52,6 +59,27 @@ test('quoted syndication tweet selects its highest-bitrate progressive MP4 inste
  assert.equal(items.length,1);
  assert.match(items[0].url,/\/1280x718\/high\.mp4$/);
  assert.equal(items[0].ext,'mp4');
+});
+test('reported main-timeline Syndication response selects the complete 720p MP4',()=>{
+ const items=ctx.parseApiData(tichysTimeline,tichysTimeline.id_str).media;
+ assert.equal(items.length,1);assert.match(items[0].url,/\/720x720\/high\.mp4$/);assert.equal(items[0].ext,'mp4');
+});
+test('empty Conversation result falls back to view-independent Syndication metadata',async()=>{
+ const liveCtx={liveToken:'cached',log:{info(){},warn(){}},ensureNotCancelled(){},parseApiData:ctx.parseApiData,
+  fetchTweetData:async()=>{const e=Error('API HTTP 404');e.status=404;throw e},fetchLiveBearerToken:async()=>null,
+  cacheLiveToken(){},fetchSyndicationData:async id=>{assert.equal(id,tichysTimeline.id_str);return tichysTimeline}};
+ vm.createContext(liveCtx);
+ vm.runInContext(src.slice(src.indexOf('async function loadItemsLive('),src.indexOf('async function onDownloadClick(')),liveCtx);
+ const result=await liveCtx.loadItemsLive(tichysTimeline.id_str);
+ assert.equal(result.apiStatus,null);assert.equal(result.items.length,1);assert.match(result.items[0].url,/\/720x720\/high\.mp4$/);
+});
+test('Syndication request is status-bound and uses the declared exact host',async()=>{
+ let requested='';const synCtx={URL,ensureNotCancelled(){},gmTextRequest:async url=>{requested=url;return JSON.stringify(tichysTimeline)}};
+ vm.createContext(synCtx);const start=src.indexOf('function syndicationToken(');const end=src.indexOf('/**\n     * Live-Fallback',start);
+ vm.runInContext(src.slice(start,end),synCtx);
+ const result=await synCtx.fetchSyndicationData(tichysTimeline.id_str);
+ const parsed=new URL(requested);assert.equal(parsed.hostname,'cdn.syndication.twimg.com');assert.equal(parsed.searchParams.get('id'),tichysTimeline.id_str);
+ assert.ok(parsed.searchParams.get('token'));assert.equal(result.id_str,tichysTimeline.id_str);assert.match(src,/^\/\/ @connect\s+cdn\.syndication\.twimg\.com$/m);
 });
 test('video posters are recognized but never accepted as downloadable photos',()=>{
  const poster='https://pbs.twimg.com/amplify_video_thumb/2113159347912237056/img/poster.jpg';

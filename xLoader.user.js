@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.39
-// @description  Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen auf X.com/Twitter herunter. In unterstützten Browsern öffnet sich die erste Dateiauswahl vor dem Streaming. Mit Fortschrittsanzeige und Abbruchbestätigung beim erneuten Klick. GM_download-Fallback und Dateinamenoptionen.
-// @description:en Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Supported browsers open the first file picker before streaming. Progress indicator, cancel confirmation on a second click, GM_download fallback and filename options.
-// @description:ru Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. В совместимых браузерах первый диалог сохранения открывается до загрузки. Есть прогресс, подтверждение отмены при повторном нажатии, резервный GM_download и настройка имён файлов.
+// @version      1.0.42
+// @description  Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen von X.com/Twitter herunter. Schnelle Dateiauswahl vor dem Streaming, zuverlässige Medienauflösung in Timeline und Einzelansicht, Fortschritt, Abbruchbestätigung, GM_download-Fallback und Dateinamenoptionen.
+// @description:en Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Fast file selection before streaming, reliable media resolution in timelines and individual posts, progress, cancel confirmation, GM_download fallback and filename options.
+// @description:ru Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. Быстрый выбор файла до потоковой передачи, надёжное определение медиа в ленте и отдельном посте, прогресс, подтверждение отмены, резервный GM_download и настройка имён файлов.
 // @author       xLoader
 // @license      MIT
 // @homepageURL  https://github.com/immerzu/xLoader
@@ -23,11 +23,33 @@
 // @connect      video.twimg.com
 // @connect      abs.twimg.com
 // @connect      pscp.tv
+// @connect      cdn.syndication.twimg.com
 // @noframes
 // @run-at       document-end
 // ==/UserScript==
 
 /*
+ * xLoader v1.0.42 (ansichtsunabhängiger Timeline-Metadatenfallback)
+ *  - Wenn Timeline-React-Daten und Conversation-API kein Video liefern,
+ *    werden öffentliche X-Syndication-Metadaten anhand der Status-ID geladen.
+ *  - Die Hauptansicht erhält damit dieselben vollständigen mediaDetails wie
+ *    der bereits funktionierende geöffnete Tweet.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.41 (laufende Timeline-Videos und Prozentfortschritt)
+ *  - Bereits laufende Timeline-Player werden nicht mehr angehalten; vorhandene
+ *    Netzwerkdaten bleiben erhalten und werden vor einem Resolver-Klick geprüft.
+ *  - Progressive ext_tw_video-/amplify_video-Quellen werden einheitlich über
+ *    ihre Media-ID zugeordnet.
+ *  - Ein paralleler HEAD-Abruf ergänzt fehlende Stream-Gesamtgrößen, damit
+ *    große direkte Videos wieder Prozentfortschritt anzeigen können.
+ * ---------------------------------------------------------------------------
+ * xLoader v1.0.40 (frische Videoquelle nach Timeline-Dateiauswahl)
+ *  - Der schnelle Speicherdialog bleibt vor dem Datentransfer erhalten.
+ *  - Timeline-Videos aus React-/Prefetch-Daten werden nach der Dateiauswahl
+ *    noch einmal über die Tweet-API abgeglichen; abgelaufene Quellen erzeugen
+ *    dadurch keine leere Zieldatei mehr.
+ *  - Unvollständige Live-Antworten ersetzen keine zusätzlichen Cache-Medien.
+ * ---------------------------------------------------------------------------
  * xLoader v1.0.39 (Härtung der DOM-Wiederanbindung)
  *  - Wiederverwendete Buttons sicher von Tasks anderer Tweet-IDs lösen.
  *  - Entfernte Buttons sofort aus WeakMap und Taskliste entfernen.
@@ -1998,6 +2020,54 @@
         }
     }
 
+    function mediaTotalFromHeaders(headers) {
+        var contentRange = responseHeader(headers, 'content-range');
+        var rangeMatch = contentRange.match(/\/(\d+)\s*$/);
+        if (rangeMatch) return Number(rangeMatch[1]) || 0;
+        var contentLength = Number(responseHeader(headers, 'content-length'));
+        return isFinite(contentLength) && contentLength > 0 ? contentLength : 0;
+    }
+
+    /**
+     * Tampermonkeys Fetch-Stream liefert beim onloadstart häufig Status 0 und
+     * noch keine Header. Ein paralleler HEAD-Abruf ermittelt dann die Größe,
+     * ohne Mediendaten vorab herunterzuladen. Fehler sind nicht fatal: Der
+     * eigentliche Stream läuft mit neutraler Fortschrittsanzeige weiter.
+     */
+    function beginDirectMediaSizeProbe(url, signal, onSize) {
+        if (typeof onSize !== 'function' || !isMediaUrl(url) || hlsUrl(url)) return function () {};
+        var handle = null;
+        var settled = false;
+        var cleanupAbort = function () {};
+        function finish(size) {
+            if (settled) return;
+            settled = true;
+            cleanupAbort();
+            if (size > 0) onSize(size);
+        }
+        function cancel() {
+            if (settled) return;
+            settled = true;
+            cleanupAbort();
+            try { if (handle && typeof handle.abort === 'function') handle.abort(); } catch (e) {}
+        }
+        cleanupAbort = onDownloadAbort(signal, cancel);
+        if (signal && signal.aborted) { cancel(); return function () {}; }
+        try {
+            handle = GM_xmlhttpRequest({
+                method: 'HEAD', url: url, timeout: Math.min(CONFIG.requestTimeoutMs, 15000),
+                onload: function (res) {
+                    if (res.status >= 200 && res.status < 400) finish(mediaTotalFromHeaders(res.responseHeaders));
+                    else finish(0);
+                },
+                onerror: function () { finish(0); },
+                ontimeout: function () { finish(0); },
+                onabort: function () { finish(0); }
+            });
+        } catch (e) { finish(0); }
+        return cancel;
+    }
+
     /**
      * Erst nach der Dateiauswahl anfordern. GM-Streaming umgeht Seiten-CORS,
      * hält keine vollständige Mediendatei im RAM und erhält Fortschritt sowie
@@ -2016,6 +2086,9 @@
         var rejectResponse = null;
         var rejectComplete = null;
         var latestResponse = null;
+        var probedTotal = 0;
+        var latestDone = 0;
+        var stopSizeProbe = function () {};
         var resolveComplete;
         var rejectCancelled;
         var cancelled = new Promise(function (resolve, reject) { rejectCancelled = reject; });
@@ -2044,6 +2117,12 @@
         try {
             cleanupAbort = onDownloadAbort(signal, function () { fail(downloadAbortError()); });
             ensureNotCancelled(signal);
+            if (typeof onProgress === 'function') {
+                stopSizeProbe = beginDirectMediaSizeProbe(url, signal, function (size) {
+                    probedTotal = size;
+                    if (latestDone > 0) onProgress({ done: latestDone, total: probedTotal });
+                });
+            }
             arm();
             var response = await new Promise(function (resolve, reject) {
                 rejectResponse = reject;
@@ -2094,8 +2173,7 @@
             writable = await file.createWritable();
             ensureNotCancelled(signal);
             function contentLength(res) {
-                var length = /(?:^|\r?\n)content-length:\s*(\d+)/i.exec(res.responseHeaders || '');
-                return length ? Number(length[1]) : 0;
+                return mediaTotalFromHeaders(res && res.responseHeaders) || probedTotal;
             }
             var total = contentLength(response);
             var done = 0;
@@ -2114,6 +2192,7 @@
                     prefixLength += keep.byteLength;
                 }
                 done += part.value.byteLength;
+                latestDone = done;
                 total = contentLength(latestResponse || response);
                 if (typeof onProgress === 'function') onProgress({ done: done, total: total });
             }
@@ -2135,6 +2214,7 @@
             throw err;
         } finally {
             cleanupAbort();
+            stopSizeProbe();
             if (timer) clearTimeout(timer);
             if (reader) try { reader.releaseLock(); } catch (_) {}
         }
@@ -2533,6 +2613,47 @@
         for (var i = 0; i < task.buttons.length; i++) hideProgress(task.buttons[i]);
     }
 
+    function isTweetDetailView(tweetId) {
+        if (typeof location === 'undefined') return false;
+        return new RegExp('/status/' + String(tweetId).replace(/[^0-9]/g, '') + '(?:/|$)').test(location.pathname || '');
+    }
+
+    function refreshItemKey(item) {
+        if (!item || !item.url) return '';
+        if (item.broadcastId) return 'broadcast:' + item.broadcastId;
+        var mediaId = mediaIdOf(item.url);
+        if (mediaId) return 'video:' + mediaId;
+        try {
+            var parsed = new URL(item.url);
+            return parsed.hostname + parsed.pathname;
+        } catch (e) {
+            return String(item.url).split('?')[0].split('#')[0];
+        }
+    }
+
+    /**
+     * Bevorzugt frische Tweet-API-Adressen, ohne bei einer gekürzten Antwort
+     * weitere Medien aus React-/Prefetch-Daten zu verlieren.
+     */
+    function preferFreshItems(current, fresh) {
+        if (!fresh || !fresh.length) return current;
+        if (!current || fresh.length >= current.length) return fresh.slice();
+        var result = current.slice();
+        for (var i = 0; i < fresh.length; i++) {
+            var key = refreshItemKey(fresh[i]);
+            var index = -1;
+            for (var j = 0; j < result.length; j++) {
+                if (key && refreshItemKey(result[j]) === key) { index = j; break; }
+            }
+            if (index >= 0) {
+                result[index] = fresh[i];
+            } else {
+                result.push(fresh[i]);
+            }
+        }
+        return result;
+    }
+
     /**
      * URL-Basis ohne Query/Hash und ohne Dateiendung — für die Deduplizierung
      * (die API liefert z. B. ".../X.jpg?name=orig", das DOM ".../X?format=jpg&
@@ -2572,17 +2693,42 @@
             if (src.indexOf('tweet_video_thumb') !== -1) continue;
             var player = posterEl.closest('[data-testid="videoPlayer"], [data-testid="videoComponent"], div[role="button"]') || posterEl.parentElement;
             if (!player) continue;
-            targets.push({ id: mediaId, player: player, url: null });
+            var video = player.querySelector('video');
+            var directUrls = video ? collectVideoUrls(video) : [];
+            var directUrl = null;
+            for (var du = 0; du < directUrls.length; du++) {
+                if (isProgressiveVideoUrl(directUrls[du]) && mediaIdOf(directUrls[du]) === mediaId) {
+                    directUrl = directUrls[du];
+                    break;
+                }
+            }
+            targets.push({ id: mediaId, player: player, video: video,
+                wasPlaying: !!(video && !video.paused), startedByResolver: false, url: directUrl });
         }
         if (!targets.length) return {};
 
         try {
             ensureNotCancelled(signal);
-            performance.clearResourceTimings();
-            for (var c = 0; c < targets.length; c++) targets[c].player.click();
+            var initialEntries = performance.getEntriesByType('resource');
+            for (var ie = initialEntries.length - 1; ie >= 0; ie--) {
+                var initialUrl = initialEntries[ie].name;
+                if (!isProgressiveVideoUrl(initialUrl)) continue;
+                var initialId = mediaIdOf(initialUrl);
+                for (var it = 0; it < targets.length; it++) {
+                    if (!targets[it].url && initialId === targets[it].id) targets[it].url = initialUrl;
+                }
+            }
+            for (var c = 0; c < targets.length; c++) {
+                // Ein laufender Player lädt bereits selbst. Ein Klick würde ihn
+                // pausieren und kann genau die gesuchte Netzwerkquelle verlieren.
+                if (!targets[c].url && !targets[c].wasPlaying) {
+                    targets[c].player.click();
+                    targets[c].startedByResolver = true;
+                }
+            }
 
             var deadline = Date.now() + 5000;
-            var open = targets.length;
+            var open = targets.filter(function (target) { return !target.url; }).length;
             while (open > 0 && Date.now() < deadline) {
                 ensureNotCancelled(signal);
                 var entries = performance.getEntriesByType('resource');
@@ -2590,7 +2736,7 @@
                     var u = entries[e].name;
                     if (!isProgressiveVideoUrl(u)) continue;
                     for (var t = 0; t < targets.length; t++) {
-                        if (!targets[t].url && u.indexOf('amplify_video/' + targets[t].id + '/vid/avc1/') !== -1) {
+                        if (!targets[t].url && mediaIdOf(u) === targets[t].id) {
                             targets[t].url = u;
                             open--;
                         }
@@ -2601,12 +2747,13 @@
                 }
             }
         } catch (e) { /* Stille ignorieren — Poster bleibt dann Bild-Notnagel */ } finally {
-            // Gestartete Wiedergaben in jedem Fall anhalten (auch bei Timeout)
+            // Nur vom Resolver gestartete Wiedergaben wieder anhalten. Bereits
+            // laufende Nutzervideos dürfen unverändert weiterlaufen.
             for (var v = 0; v < targets.length; v++) {
-                var video = targets[v].player.querySelector('video');
-                if (video) {
-                    video.muted = true;
-                    video.pause();
+                var startedVideo = targets[v].player.querySelector('video');
+                if (startedVideo && targets[v].startedByResolver) {
+                    startedVideo.muted = true;
+                    startedVideo.pause();
                 }
             }
         }
@@ -2726,6 +2873,23 @@
         return result;
     }
 
+    function syndicationToken(statusId) {
+        var numericId = Number(statusId);
+        if (!isFinite(numericId) || numericId <= 0) return '';
+        return ((numericId / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
+    }
+
+    async function fetchSyndicationData(statusId, signal) {
+        var token = syndicationToken(statusId);
+        if (!token) throw new Error('Syndication: ungültige Tweet-ID');
+        var url = 'https://cdn.syndication.twimg.com/tweet-result?id=' +
+            encodeURIComponent(statusId) + '&lang=en&token=' + encodeURIComponent(token);
+        var text = await gmTextRequest(url, {}, signal, 'Syndication');
+        ensureNotCancelled(signal);
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('Syndication JSON-Parse-Fehler'); }
+    }
+
     /**
      * Live-Fallback für den Klick (Cache-Miss): API -> Live-Token-Retry.
      * Liefert { items, apiStatus } — der Fehlerstatus wird bewusst lokal
@@ -2765,6 +2929,24 @@
             }
         }
 
+        // Die Timeline enthält je nach X-Rendering weder vollständige React-
+        // Props noch eine erfolgreiche Conversation-Antwort. Die öffentliche
+        // Syndication-Antwort ist an die Status-ID gebunden und liefert dieselben
+        // mediaDetails unabhängig davon, ob der Tweet geöffnet wurde.
+        if (!items.length) {
+            log.info('Versuche ansichtsunabhängigen Syndication-Fallback …');
+            try {
+                var syndication = await fetchSyndicationData(tweetId, signal);
+                items = parseApiData(syndication, tweetId).media;
+                if (items.length) {
+                    apiStatus = null;
+                    log.info('Syndication-Medien ermittelt (' + items.length + ').');
+                }
+            } catch (syndicationErr) {
+                log.warn('Syndication-Fallback fehlgeschlagen: ' + syndicationErr.message);
+            }
+        }
+
         return { items: items, apiStatus: apiStatus };
     }
 
@@ -2799,6 +2981,7 @@
         var selectedFile = null;
         var selectedFilename = null;
         var retryItems = null;
+        var usedFastItems = false;
 
         try {
             ensureNotCancelled(task.signal);
@@ -2823,6 +3006,7 @@
             if (cached && cached.length) {
                 log.info('Cache-Treffer für Tweet ' + tweetId + ' — sofortiger Download.');
                 items = cached;
+                usedFastItems = true;
             } else {
                 if (mediaCache.has(tweetId)) mediaCache.delete(tweetId); // abgelaufen
                 var live = await loadItemsLive(tweetId, task.signal);
@@ -2838,6 +3022,25 @@
                     handle: handle, id: tweetId, index: 1, ext: items[0].ext
                 }));
                 selectedFile = await selectDownloadFile(selectedFilename);
+            }
+            // React-/Prefetch-URLs können in einer langen Timeline bereits
+            // abgelaufen oder nur unvollständig sein. Der Dialog bleibt sofort:
+            // Erst NACH der Dateiauswahl wird eine frische Videoquelle geladen.
+            // Die Einzelansicht hat bereits frische Tweet-Metadaten und bleibt
+            // unverändert. Bei API-Fehlern gilt weiterhin der schnelle Fallback.
+            if (selectedFile && usedFastItems && items.length &&
+                (items[0].ext === 'mp4' || items[0].ext === 'ts') &&
+                !isTweetDetailView(tweetId)) {
+                setTaskProgress(task, '…', 'Aktualisiere Videoquelle …');
+                var refreshed = await loadItemsLive(tweetId, task.signal);
+                ensureNotCancelled(task.signal);
+                if (refreshed.items && refreshed.items.length) {
+                    items = preferFreshItems(items, refreshed.items);
+                    apiStatus = refreshed.apiStatus;
+                    log.info('Videoquelle nach Timeline-Dateiauswahl aktualisiert.');
+                } else {
+                    log.warn('Frische Timeline-Metadaten nicht verfügbar; verwende vorgeladene Quelle.');
+                }
             }
             // Bei einem Cache-Miss kann die API erst nach dem bereits geoeffneten
             // MP4-Dialog eine TS-Broadcastquelle liefern. Niemals TS als MP4
@@ -3229,7 +3432,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.39 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.42 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

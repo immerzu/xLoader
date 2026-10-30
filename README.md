@@ -31,11 +31,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 2. Установите скрипт: откройте [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey предложит установку. (Альтернатива: склонируйте репозиторий и импортируйте файл через панель Tampermonkey.)
 3. Откройте [x.com](https://x.com) — под каждым твитом с медиа появится кнопка загрузки в панели действий.
 
-## What's new in v1.0.39 / Neu in v1.0.39 / Новое в v1.0.39
+## What's new in v1.0.42 / Neu in v1.0.42 / Новое в v1.0.42
 
-- **EN:** Hardens media integrity, cancellation, URL validation and HLS processing; fixes nested/quoted media, preserves complete multi-media downloads and keeps progress visible while X recycles timeline DOM nodes.
-- **DE:** Härtet Medienintegrität, Abbruch, URL-Prüfung und HLS-Verarbeitung; korrigiert verschachtelte/zitierte Medien, erhält vollständige Mehrfachdownloads und hält den Fortschritt beim Timeline-DOM-Recycling sichtbar.
-- **RU:** Усилены проверки целостности медиа, отмена, URL и обработка HLS; исправлены вложенные/цитируемые медиа, полная загрузка нескольких файлов и сохранение прогресса при переработке DOM ленты X.
+- **EN:** Resolves public tweet media independently of the current X view, refreshes stale timeline video URLs after file selection and restores percentage progress for large progressive videos while retaining the v1.0.39 hardening and multi-media support.
+- **DE:** Löst öffentliche Tweet-Medien unabhängig von der aktuellen X-Ansicht auf, erneuert veraltete Timeline-Video-URLs nach der Dateiauswahl und stellt den Prozentfortschritt großer progressiver Videos wieder her; Härtung und Mehrfachmedien aus v1.0.39 bleiben erhalten.
+- **RU:** Медиа публичных постов теперь определяются независимо от текущего вида X, устаревшие URL видео в ленте обновляются после выбора файла, а для больших progressive-видео снова показывается процентный прогресс; усиленная защита и загрузка нескольких файлов из v1.0.39 сохранены.
 
 ## Features / Funktionen / Возможности
 
@@ -68,15 +68,17 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 ## How it works / Technik / Как это работает
 
-**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Media resolution uses cached/rendered metadata, the X API and DOM/progressive/HLS/broadcast fallbacks. No external dependencies, no server.
+**English 🇬🇧:** Greasemonkey metadata: `@match https://x.com/*` and `https://twitter.com/*`; grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` for `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`, `cdn.syndication.twimg.com`; `@noframes`, `@run-at document-end`, auto-update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Media resolution uses cached/rendered metadata, the X API, public Syndication metadata and DOM/progressive/HLS/broadcast fallbacks. No external dependencies, no server.
 
-**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Medienauflösung über Cache/gerenderte Metadaten, X-API und DOM-/progressive/HLS-/Broadcast-Fallbacks. Keine externen Abhängigkeiten, keine Server.
+**Deutsch 🇩🇪:** Greasemonkey-Metadaten: `@match https://x.com/*` und `https://twitter.com/*`; Grants `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` für `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`, `cdn.syndication.twimg.com`; `@noframes`, `@run-at document-end`, Auto-Update via `@updateURL`/`@downloadURL` (raw GitHub `main`). Medienauflösung über Cache/gerenderte Metadaten, X-API, öffentliche Syndication-Metadaten und DOM-/progressive/HLS-/Broadcast-Fallbacks. Keine externen Abhängigkeiten, keine Server.
 
-**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Медиа определяются через кэш/метаданные, X API и DOM/progressive/HLS/трансляции. Без внешних зависимостей и серверов.
+**Русский 🇷🇺:** Метаданные Greasemonkey: `@match https://x.com/*` и `https://twitter.com/*`; гранты `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; `@connect` для `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`, `cdn.syndication.twimg.com`; `@noframes`, `@run-at document-end`, автообновление через `@updateURL`/`@downloadURL` (raw GitHub `main`). Медиа определяются через кэш/метаданные, X API, публичные Syndication-метаданные и DOM/progressive/HLS/трансляции. Без внешних зависимостей и серверов.
 
 ## Version history / Versionshistorie / История версий
 
-**English 🇬🇧:** Latest version: **v1.0.39** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+**English 🇬🇧:** Latest version: **v1.0.42** — the full changelog lives in the comment at the top of `xLoader.user.js`.
+
+- **v1.0.42** — view-independent public tweet metadata fallback, refreshed timeline video URLs after file selection and restored percentage progress for large progressive videos.
 
 - **v1.0.39** — hardened media/HLS integrity and cancellation, fixed nested/quoted media, complete multi-media downloads, and persistent progress across timeline DOM recycling.
 
@@ -105,7 +107,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey menu (save-as mode, clear cache), robust tweet-ID extraction.
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
-**Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.39** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+**Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.42** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.42** — ansichtsunabhängiger Metadatenfallback für öffentliche Tweets, erneuerte Timeline-Video-URLs nach der Dateiauswahl und wiederhergestellter Prozentfortschritt für große progressive Videos.
 
 - **v1.0.39** — Medien-/HLS-Integrität und Abbruch gehärtet, verschachtelte/zitierte Medien korrigiert, vollständige Mehrfachdownloads sowie dauerhafte Fortschrittsanzeige beim Timeline-DOM-Recycling.
 
@@ -134,7 +138,9 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — Tampermonkey-Menü (Speichern-Modus, Cache leeren), robustere Tweet-ID-Extraktion.
 - **v1.0.6** — Umbenennung auf „xLoader“ (zuvor „Downloadhilfe“).
 
-**Русский 🇷🇺:** Последняя версия: **v1.0.39** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+**Русский 🇷🇺:** Последняя версия: **v1.0.42** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
+
+- **v1.0.42** — независимое от вида определение медиа публичных постов, обновление URL видео из ленты после выбора файла и восстановленный процентный прогресс для больших progressive-видео.
 
 - **v1.0.39** — усилена целостность медиа/HLS и отмена, исправлены вложенные/цитируемые медиа, полная загрузка нескольких файлов и сохранение прогресса при переработке DOM.
 
@@ -163,11 +169,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33, v1.0.39 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33, v1.0.39, v1.0.42 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## Development / Entwicklung / Разработка
 
-Published source / veröffentlichte Quelle: **v1.0.39**. It retains the previous media support, hardens download integrity and cancellation, restores progress after timeline DOM recycling, rejects cross-tweet button reuse, prunes detached bindings and mirrors progress across visible representations; see [HANDOVER v1.0.39](memory/HANDOVER_v1.0.39.md). Earlier test builds remain historical local archives.
+Published source / veröffentlichte Quelle: **v1.0.42**. It retains the v1.0.39 hardening and media support, refreshes stale timeline sources, resolves public tweet media independently of the current X view and restores percentage progress for large progressive videos; see [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md). Earlier test builds remain historical local archives.
 
 **English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins (checked with Node.js 22.23.2). Run the syntax check below from the project root. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
@@ -179,7 +185,7 @@ Published source / veröffentlichte Quelle: **v1.0.39**. It retains the previous
 node --check xLoader.user.js
 ```
 
-The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.39 passed 75 local tests and was user-verified under Windows/Tampermonkey for progress and complete multi-media downloads. Publication evidence is recorded in [HANDOVER v1.0.39](memory/HANDOVER_v1.0.39.md); earlier v1.0.33 evidence remains in [HANDOVER v1.0.33](memory/HANDOVER_v1.0.33.md).
+The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.42 passed 83 local tests; the user confirmed the corrected main-timeline download behavior and progress in their Windows/Tampermonkey browser. Publication evidence is recorded in [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md); earlier evidence remains in the historical handovers.
 
 | Path / Pfad / Путь | Purpose / Zweck / Назначение |
 |---|---|

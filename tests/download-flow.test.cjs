@@ -18,7 +18,7 @@ function fixture(){
  const media=new Uint8Array([0,0,0,12,102,116,121,112,105,115,111,109]);
  const file={async createWritable(){state.events.push('writable');return {async write(b){state.chunks.push(Buffer.from(b))},async close(){state.closed++},async abort(){state.aborted++}}}};
  const win={async showSaveFilePicker(o){assert.equal(this,win);state.events.push('picker');state.suggested=o.suggestedName;return file}};
- const context={URL,AbortController,window:{showSaveFilePicker:win.showSaveFilePicker},document:{defaultView:win},navigator:{userActivation:{isActive:true}},log:{info(){},warn(){},error(){}},setTimeout(fn){state.timers.set(++id,fn);return id},clearTimeout(id){state.timers.delete(id)},
+ const context={URL,AbortController,CONFIG:{requestTimeoutMs:60000},window:{showSaveFilePicker:win.showSaveFilePicker},document:{defaultView:win},navigator:{userActivation:{isActive:true}},log:{info(){},warn(){},error(){}},setTimeout(fn){state.timers.set(++id,fn);return id},clearTimeout(id){state.timers.delete(id)},
   isMediaUrl(){return true},hlsUrl(){return false},allowedImageUrl(){return true},responseHeader(headers,name){const m=new RegExp('(?:^|\\r?\\n)'+name+':\\s*([^\\r\\n]+)','i').exec(headers||'');return m?m[1].trim():''},
   assertFullHttpResponse(status){if(status!==200)throw Error('Download HTTP '+status)},assertMediaContentType(){},
   ensureNotCancelled(signal){if(signal&&signal.aborted){const e=Error('Download abgebrochen');e.name='AbortError';throw e}},
@@ -26,11 +26,14 @@ function fixture(){
   isCancellation(e,signal){return !!(signal&&signal.aborted)||!!(e&&e.name==='AbortError')},
   onDownloadAbort(signal,fn){if(!signal)return()=>{};signal.addEventListener('abort',fn,{once:true});return()=>signal.removeEventListener('abort',fn)}};
  context.GM_xmlhttpRequest=o=>{assert.equal('timeout' in o,false);assert.equal(typeof o.onloadend,'function');state.requests++;queueMicrotask(()=>{o.onloadstart({status:0,readyState:1,responseHeaders:'',response:new ReadableStream({start(c){c.enqueue(media);c.close()}})});const final={status:200,readyState:4,responseHeaders:'Content-Length: '+media.length};o.onreadystatechange(final);o.onload(final)});return {abort(){state.events.push('abort')}}};
- vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function allowedImageUrl('),source.indexOf('function hlsUrl(')),context);vm.runInContext(source.slice(source.indexOf('function isProgressiveVideoUrl('),source.indexOf('function isMediaUrl(')),context);vm.runInContext(functions,context);return {context,state,file,media};
+ vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function allowedImageUrl('),source.indexOf('function hlsUrl(')),context);vm.runInContext(source.slice(source.indexOf('function isProgressiveVideoUrl('),source.indexOf('function isMediaUrl(')),context);vm.runInContext(functions,context);
+ context.__beginDirectMediaSizeProbe=context.beginDirectMediaSizeProbe;
+ context.beginDirectMediaSizeProbe=(url,signal,onSize)=>{onSize(media.length);return()=>{}};
+ return {context,state,file,media};
 }
-function clickFixture({cached=true,all=false,picker=true,cancel=false,mergeError=false,pending=false}={}){
+function clickFixture({cached=true,all=false,picker=true,cancel=false,mergeError=false,pending=false,detail=false}={}){
  const f=fixture(),{context:c,state:s,file}=f;let accept;
- Object.assign(c,{isMediaUrl(){return true},hlsUrl(){return false},renderedTweetMedia(){return []},broadcastFromDom(){return null},saveAsMode:all?'all':'first',CONFIG:{progressBadgeMinBytes:5e6},runningDownloads:new WeakMap(),runningDownloadsByTweet:new Map(),showCancelPopup(){},closeCancelPopup(){},setBusy(b,v){b.disabled=v},getTweetId(){return '123'},getHandle(){return 'author'},sanitizeFilenamePart(v){return v},formatFilename(t,d){return '@'+d.handle+'_'+d.id+'_'+d.index+'.'+d.ext},getFilenameTemplate(){return ''},getCachedItems(){return cached?[{url:'first',ext:'mp4'}]:null},mediaCache:new Map(),prefetchSeen:new Set(),prefetchSeenAt:new Map(),setCachedItems(){},async loadItemsLive(){s.events.push('metadata');return {items:[{url:'first',ext:'mp4'}]}},async mergeDomItems(t,items){s.events.push('merge');if(mergeError)throw Error('merge');return [...items,{url:'second',ext:'png'}]},async downloadUrl(url,name,saveAs,onProgress){s.events.push({legacy:true,url,name,saveAs});if(c.__progressEvent&&onProgress)onProgress(c.__progressEvent)},hideProgress(){s.progress.push('hidden')},showProgress(b,value){s.progress.push(value)},flashError(b,msg){s.error=true;s.errorMessage=msg}});
+ Object.assign(c,{location:{pathname:detail?'/author/status/123':'/home'},isMediaUrl(){return true},hlsUrl(){return false},mediaIdOf(url){const m=String(url).match(/(?:amplify_video|ext_tw_video|tweet_video)[^/]*\/([A-Za-z0-9_-]+)/);return m?m[1]:null},renderedTweetMedia(){return []},broadcastFromDom(){return null},saveAsMode:all?'all':'first',CONFIG:{progressBadgeMinBytes:5e6},runningDownloads:new WeakMap(),runningDownloadsByTweet:new Map(),showCancelPopup(){},closeCancelPopup(){},setBusy(b,v){b.disabled=v},getTweetId(){return '123'},getHandle(){return 'author'},sanitizeFilenamePart(v){return v},formatFilename(t,d){return '@'+d.handle+'_'+d.id+'_'+d.index+'.'+d.ext},getFilenameTemplate(){return ''},getCachedItems(){return cached?[{url:'first',ext:'mp4'}]:null},mediaCache:new Map(),prefetchSeen:new Set(),prefetchSeenAt:new Map(),setCachedItems(){},async loadItemsLive(){s.events.push('metadata');return {items:[{url:'first',ext:'mp4'}]}},async mergeDomItems(t,items){s.events.push('merge');if(mergeError)throw Error('merge');return [...items,{url:'second',ext:'png'}]},async downloadUrl(url,name,saveAs,onProgress){s.events.push({legacy:true,url,name,saveAs});if(c.__progressEvent&&onProgress)onProgress(c.__progressEvent)},hideProgress(){s.progress.push('hidden')},showProgress(b,value){s.progress.push(value)},flashError(b,msg){s.error=true;s.errorMessage=msg}});
  c.selectDownloadFile=async name=>{s.events.push('picker');if(cancel){const e=Error();e.name='AbortError';throw e}if(pending)return new Promise(r=>accept=r);return picker?file:null};
  c.downloadSelectedFile=async(url,handle)=>{assert.equal(handle,file);s.events.push({selected:true,url})};
  vm.runInContext(click,c);return {...f,accept:()=>accept(file)};
@@ -40,7 +43,20 @@ test('missing File System Access API uses legacy fallback',async()=>{const f=fix
 test('expired activation uses legacy fallback',async()=>{const f=fixture();f.context.navigator.userActivation.isActive=false;assert.equal(await f.context.selectDownloadFile('a'),null);assert.equal(f.state.events.length,0)});
 for(const name of ['SecurityError','NotSupportedError','TypeError'])test(name+' uses legacy fallback',async()=>{const f=fixture();f.context.window.showSaveFilePicker=()=>{const e=Error();e.name=name;throw e};assert.equal(await f.context.selectDownloadFile('a'),null)});
 test('picker cancellation is not retried as legacy download',async()=>{const f=clickFixture({cancel:true}),btn={};await f.context.onDownloadClick({},btn);assert.deepEqual(f.state.events,['picker']);assert.equal(btn.disabled,false)});
+test('HEAD size probe supplies a missing stream total without downloading media',async()=>{
+ const f=fixture();let options,size=0;
+ f.context.GM_xmlhttpRequest=o=>{options=o;queueMicrotask(()=>o.onload({status:200,responseHeaders:'Content-Length: 50000000'}));return{abort(){}}};
+ f.context.__beginDirectMediaSizeProbe('https://video.twimg.com/tweet_video/a.mp4',null,value=>{size=value});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(options.method,'HEAD');assert.equal(size,50000000);
+});
 test('stream writes exact bytes, reports progress, closes once, clears timer',async()=>{const f=fixture();await f.context.downloadSelectedFile('u',f.file,p=>f.state.progress.push(p));assert.deepEqual(Buffer.concat(f.state.chunks),Buffer.from(f.media));assert.equal(f.state.closed,1);assert.equal(f.state.progress[0].done,f.media.length);assert.equal(f.state.progress[0].total,f.media.length);assert.equal(f.state.timers.size,0)});
+test('stream progress uses probed total when Tampermonkey omits response length',async()=>{
+ const f=fixture();f.context.beginDirectMediaSizeProbe=(url,signal,onSize)=>{onSize(f.media.length);return()=>{}};
+ f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{o.onloadstart({status:0,responseHeaders:'',response:new ReadableStream({start(c){c.enqueue(f.media);c.close()}})});o.onload({status:200,responseHeaders:''})});return{abort(){}}};
+ await f.context.downloadSelectedFile('u',f.file,p=>f.state.progress.push(p));
+ assert.equal(f.state.progress.at(-1).total,f.media.length);assert.equal(f.state.progress.at(-1).done,f.media.length);assert.equal(f.state.closed,1);
+});
 
 test('stream end waits for final HTTP status before committing',async()=>{
  const f=fixture();let finish;
@@ -72,7 +88,29 @@ test('unsupported GM stream fails visibly without committing',async()=>{const f=
 test('watchdog aborts a stalled request',async()=>{const f=fixture();let aborts=0;f.context.GM_xmlhttpRequest=()=>({abort(){aborts++}});const p=f.context.downloadSelectedFile('u',f.file);const rejected=assert.rejects(p,/Timeout/);[...f.state.timers.values()][0]();await rejected;assert.equal(aborts,1);assert.equal(f.state.timers.size,0)});
 test('disk error aborts instead of closing',async()=>{const f=fixture();f.file.createWritable=async()=>({async write(){throw Error('disk full')},async close(){f.state.closed++},async abort(){f.state.aborted++}});await assert.rejects(f.context.downloadSelectedFile('u',f.file),/disk full/);assert.equal(f.state.closed,0);assert.equal(f.state.aborted,1)});
 test('transport abort during read does not commit partial bytes',async()=>{const f=fixture();f.context.GM_xmlhttpRequest=o=>{queueMicrotask(()=>{const stream=new ReadableStream({start(c){c.enqueue(new Uint8Array([1]));},pull(){queueMicrotask(()=>o.onabort())}});o.onloadstart({status:200,responseHeaders:'',response:stream})});return {abort(){}}};await assert.rejects(f.context.downloadSelectedFile('u',f.file),/abgebrochen/);assert.equal(f.state.closed,0);assert.equal(f.state.aborted,1)});
-test('cache hit selects file before video merge, preserves multi-media filenames',async()=>{const f=clickFixture(),b={};await f.context.onDownloadClick({},b);assert.deepEqual(f.state.events.slice(0,2),['picker','merge']);const next=f.state.events.find(x=>x.legacy);assert.equal(next.name,'@author_123_2.png');assert.equal(next.saveAs,false);assert.equal(b.disabled,false)});
+test('cache hit selects file before metadata refresh and video merge, preserves multi-media filenames',async()=>{const f=clickFixture(),b={};await f.context.onDownloadClick({},b);assert.deepEqual(f.state.events.slice(0,3),['picker','metadata','merge']);const next=f.state.events.find(x=>x.legacy);assert.equal(next.name,'@author_123_2.png');assert.equal(next.saveAs,false);assert.equal(b.disabled,false)});
+test('timeline cache hit replaces stale video URL only after the picker',async()=>{
+ const f=clickFixture(),stale='https://video.twimg.com/amplify_video/99/vid/old.mp4?tag=1',fresh='https://video.twimg.com/amplify_video/99/vid/fresh.mp4?tag=2';
+ f.context.getCachedItems=()=>[{url:stale,ext:'mp4'}];
+ f.context.loadItemsLive=async()=>{f.state.events.push('metadata');return {items:[{url:fresh,ext:'mp4'}]}};
+ f.context.mergeDomItems=async(t,v)=>{f.state.events.push('merge');return v};
+ await f.context.onDownloadClick({},{});
+ assert.deepEqual(f.state.events.slice(0,3),['picker','metadata','merge']);
+ assert.equal(f.state.events.find(e=>e.selected).url,fresh);
+});
+test('incomplete fresh response updates its matching item without dropping other media',()=>{
+ const f=clickFixture(),current=[
+  {url:'https://video.twimg.com/amplify_video/11/vid/old.mp4',ext:'mp4'},
+  {url:'https://video.twimg.com/amplify_video/22/vid/second.mp4',ext:'mp4'}
+ ],fresh=[{url:'https://video.twimg.com/amplify_video/11/vid/fresh.mp4',ext:'mp4'}];
+ const result=f.context.preferFreshItems(current,fresh);
+ assert.equal(result.length,2);assert.equal(result[0].url,fresh[0].url);assert.equal(result[1].url,current[1].url);
+});
+test('tweet detail view keeps its rendered source and skips the timeline refresh',async()=>{
+ const f=clickFixture({detail:true});await f.context.onDownloadClick({},{});
+ assert.deepEqual(f.state.events.slice(0,2),['picker','merge']);
+ assert.equal(f.state.events.some(e=>e==='metadata'),false);
+});
 test('all mode keeps legacy saveAs for subsequent media',async()=>{const f=clickFixture({all:true});await f.context.onDownloadClick({},{});assert.equal(f.state.events.find(x=>x.legacy).saveAs,true)});
 test('cache miss resolves metadata before choosing file',async()=>{const f=clickFixture({cached:false});await f.context.onDownloadClick({},{});assert.deepEqual(f.state.events.slice(0,3),['metadata','picker','merge'])});
 test('double click while picker pending opens one picker',async()=>{const f=clickFixture({pending:true}),b={};const p=f.context.onDownloadClick({},b);await f.context.onDownloadClick({},b);assert.equal(f.state.events.filter(e=>e==='picker').length,1);f.accept();await p;assert.equal(b.disabled,false)});
@@ -85,6 +123,7 @@ test('progress is mirrored to every connected representation of one tweet',()=>{
 test('expired second HLS picker caches remainder and resumes on next click',async()=>{
  const f=clickFixture(),items=[{url:'https://video.twimg.com/x/1.m3u8',ext:'mp4'},{url:'https://video.twimg.com/x/2.m3u8',ext:'mp4'}];let cache=items,picks=0;
  f.context.getCachedItems=()=>cache;f.context.mergeDomItems=async(t,v)=>v;f.context.hlsUrl=()=>true;
+ f.context.loadItemsLive=async()=>({items:[]});
  f.context.downloadHlsFile=async url=>f.state.events.push({hls:url});
  f.context.setCachedItems=(id,v)=>{cache=v};f.context.selectDownloadFile=async()=>++picks===2?null:f.file;
  await f.context.onDownloadClick({},{});assert.equal(f.state.events.filter(e=>e.hls).length,1);assert.equal(cache.length,1);assert.equal(cache[0].url,items[1].url);
@@ -96,6 +135,7 @@ test('reported two-video tweet keeps both highest-quality MP4s and downloads bot
  const items=f.context.parseApiData(data,data.id_str).media;assert.equal(items.length,2);
  assert.match(items[0].url,/2160x3840/);assert.match(items[1].url,/480x852/);
  f.context.isMediaUrl=()=>true;f.context.renderedTweetMedia=()=>[];f.context.getCachedItems=()=>items;f.context.mergeDomItems=async(t,v)=>v;
+ f.context.loadItemsLive=async()=>({items});
  await f.context.onDownloadClick({querySelectorAll(){return[]}},{});
  const downloads=f.state.events.filter(e=>e.selected||e.legacy);
  assert.equal(downloads.length,2,f.state.errorMessage);assert.equal(downloads[0].url,items[0].url);assert.equal(downloads[1].url,items[1].url);assert.match(downloads[1].name,/_2\.mp4$/);

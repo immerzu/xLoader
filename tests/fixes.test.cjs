@@ -66,7 +66,7 @@ function drainLongTimers(ms) {
   }
 }
 
-// ---- Performance-Mock: pro Zyklus (clearResourceTimings) ist der 1. Abruf leer ----
+// ---- Performance-Mock: erster Abruf leer, danach Player-Ressourcen sichtbar ----
 const perfEntries = [
   'https://video.twimg.com/amplify_video/ID1/vid/avc1/1280x720/a.mp4',
   'https://video.twimg.com/amplify_video/ID2/vid/avc1/1920x1080/b.mp4'
@@ -117,6 +117,7 @@ class El {
   }
   querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
   click() { this.clicked++; }
+  pause() { this.pauseCalls = (this.pauseCalls || 0) + 1; this.paused = true; }
 }
 
 function matchSel(el, sel) {
@@ -276,9 +277,26 @@ const sleep = ms => new Promise(r => realSetTimeout(r, ms));
   check('F5a mergeDomItems: beide Poster-MP4s aufgelöst',
     merged.length === 2 && merged.every(i => i.url.indexOf('/vid/avc1/') !== -1),
     JSON.stringify(merged));
-  check('F5b mergeDomItems: ein gemeinsamer Poll-Zyklus (1 clear, 3 Abrufe einschließlich HLS-Prüfung)',
-    perf.clears === 1 && perf.totalCalls === 3,
+  check('F5b mergeDomItems: vorhandene Netzwerkdaten bleiben erhalten (kein clear)',
+    perf.clears === 0 && perf.totalCalls === 2,
     'clears=' + perf.clears + ', calls=' + perf.totalCalls);
+
+  // Bereits laufende Timeline-Videos dürfen nicht durch einen Resolver-Klick
+  // pausiert werden; ext_tw_video wird wie amplify_video über die Media-ID erkannt.
+  perf.entries = ['https://video.twimg.com/ext_tw_video/ID3/pu/vid/avc1/1280x720/c.mp4'];
+  perf.clears = 0; perf.totalCalls = 0; perf.cycleCalls = 0;
+  const playing = article();
+  const playingPhoto = photo();
+  const playingPlayer = new El('div', { role: 'button' });
+  playingPlayer.append(img('https://pbs.twimg.com/ext_tw_video_thumb/ID3/pu/img/x.jpg'));
+  const playingVideo = new El('video');playingVideo.paused = false;playingVideo.currentSrc = 'blob:https://x.com/player';
+  playingPlayer.append(playingVideo);playingPhoto.append(playingPlayer);playing.append(playingPhoto);
+  const playingMerged = await X.mergeDomItems(playing, []);
+  check('F5c laufendes ext_tw_video: Quelle erkannt, Player nicht geklickt oder pausiert',
+    playingMerged.length === 1 && /ext_tw_video\/ID3/.test(playingMerged[0].url) &&
+      playingPlayer.clicked === 0 && !playingVideo.pauseCalls,
+    'items=' + JSON.stringify(playingMerged) + ', clicks=' + playingPlayer.clicked + ', pauses=' + playingVideo.pauseCalls);
+  perf.entries = perfEntries;
 
   // ===== F6: Dedup — Poster, dessen Video die API liefert, wird nicht erneut aufgelöst =====
   perf.clears = 0; perf.totalCalls = 0; perf.cycleCalls = 0;

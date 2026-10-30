@@ -1,8 +1,8 @@
-# xLoader — FACT SHEET (Arbeitsstand und Release: v1.0.39, 2026-10-23)
+# xLoader — FACT SHEET (Arbeitsstand und Releasevorbereitung: v1.0.42, 2026-10-30)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.39 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.42 dokumentiert).
 
 ## Kerndaten
 
@@ -15,9 +15,11 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Auto-Update im Skript:** `@updateURL`/`@downloadURL` = raw GitHub `main`.
 - **Install-Link:** `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js` (Tampermonkey bietet Installation an).
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
-- **Verifizierter Release-Stand:** v1.0.39, Commit und Tagziel `bbd2dc7ed46399920f89b4a36977815e22bd13ba`. GitHub-Asset 166.367 Bytes, SHA-256 `A5A78F917F1EE701CDD2152D0F8A87F6D546C5E40A6798C67A3955DFEA27EA39`; Greasy-Fork-Rohfassung 166.343 Bytes, SHA-256 `16BFAF0ACB946379EC90BD11E0E2DFB884786079F52F652DE3433EFF8708159C`, nach Entfernung der GF-eigenen Update-URL-Zeilen inhaltlich identisch. Aktueller Einstieg: `HANDOVER_v1.0.39.md`.
+- **Aktueller freigegebener Arbeitsstand:** v1.0.42. Die Veröffentlichung wird erst nach Kontrolle von GitHub-Asset und Greasy-Fork-Auslieferung als vollständig verifiziert geführt. Aktueller Einstieg: `HANDOVER_v1.0.42.md`.
 
-## Aktueller Arbeits- und Release-Stand (v1.0.39)
+## Aktueller Arbeits- und Release-Stand (v1.0.42)
+
+- **v1.0.42, 2026-10-30:** Öffentliche Tweet-Medien über einen ansichtsunabhängigen Syndication-Fallback auflösen; veraltete Timeline-Videoquellen nach der frühen Dateiauswahl erneuern; laufende Player/Performance-Quellen erhalten und fehlende direkte Gesamtgrößen für Prozentfortschritt per HEAD ergänzen. 83 lokale Subtests erfolgreich. Nutzer bestätigte die Korrektur unter Windows/Tampermonkey und gab die Veröffentlichung frei. Details: `HANDOVER_v1.0.42.md`.
 
 - **v1.0.39, 2026-10-23:** Downloadintegrität, HLS, Abbruch, Medienauswahl und DOM-Wiederanbindung gehärtet. Ein von X für einen anderen Tweet recycelter Button wird vom alten Task getrennt; entfernte Buttons werden bereinigt; mehrere Darstellungen erhalten synchron denselben Fortschritt. Syntax und 75 lokale Subtests erfolgreich. Nutzer bestätigte Fortschrittsanzeige sowie vollständige Mehrfachmedien-Downloads unter Windows/Tampermonkey. GitHub und Greasy Fork veröffentlicht und inhaltlich geprüft. Details: `HANDOVER_v1.0.39.md`.
 - **v1.0.38-dev, 2026-10-23:** Bereits vorhandene xLoader-Buttons werden nach DOM-Änderungen wieder an laufende Tweet-Tasks gebunden. Der Observer berücksichtigt auch reine Entfernungen innerhalb eines Tweets, sodass ein von X entferntes Badge wiederhergestellt wird. Syntax und 73 lokale Subtests erfolgreich; echter Tampermonkey-Scrolltest noch offen. Details: `HANDOVER_v1.0.38-dev.md`.
@@ -42,7 +44,7 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 
 ## Metablock & Greasy-Fork-Format (WICHTIG)
 
-- **`@match`:** `https://x.com/*` und `https://twitter.com/*`; **Grants:** `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; **`@connect`:** `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`; **`@noframes`, `@run-at document-end`, `@license MIT`.**
+- **`@match`:** `https://x.com/*` und `https://twitter.com/*`; **Grants:** `GM_download`, `GM_addStyle`, `GM_xmlhttpRequest`, `GM_registerMenuCommand`; **`@connect`:** `x.com`, `twitter.com`, `pbs.twimg.com`, `video.twimg.com`, `abs.twimg.com`, `pscp.tv`, `cdn.syndication.twimg.com`; **`@noframes`, `@run-at document-end`, `@license MIT`.**
 - **`@description`-Format (seit v1.0.23):** **lokalisiert** — `@description` = deutsche Kurzbeschreibung (Default; entspricht der GF-Skript-Locale `de` von xLoader) + `@description:en` + `@description:ru` (je eigene Zeile). Damit ist das Skript in der GF-Suche unter DE/EN/RU auffindbar. **Kein** `@description:de` (wird bei Skript-Locale `de` von GF ignoriert), keine `@name:xx`-Zeilen ohne passendes `@description:xx` (GF-Validierung), keine einzeiligen DE/EN/RU-Mischtexte (v1.0.20–22: machten das Skript nur in EINER Sprache auffindbar). Vor v1.0.20: v1.0.19 = EN + `@description:de` + `@description:ru` (GF-i18n), davor zweisprachig.
 - **`description.md`** (Repo-Root): Quelle für Greasy Fork „Zusätzliche Informationen“ — DE → RU → EN, jeweils ein Absatz, KEINE Flaggen-Überschriften; im GF-Admin als zusätzliche Sync-Quelle hinterlegt (Format **markdown**).
 - **GF-Admin-Falle:** es gibt ZWEI Sync-Felder mit gleichem Platzhalter „(Internetadresse)“: `script[sync_identifier]` = Skript-URL (`…/xLoader.user.js`) vs. `additional_info_sync[0][sync_identifier]` = Beschreibungsdatei (`…/description.md`). Nicht verwechseln — falsches Feld synchronisiert das Skript aus der Beschreibungsdatei.
@@ -60,7 +62,7 @@ gelten nur für die jeweilige alte Version.
 
 Historischer Funktionskatalog und alte Datenflüsse:
 [HANDOVER v1.0.23 §5](HANDOVER_v1.0.23.md#5-funktionskatalog-zeilen--v1023).
-Aktueller Prüf- und Release-Stand: [HANDOVER v1.0.39](HANDOVER_v1.0.39.md). Frühere Release-Nachweise: [HANDOVER v1.0.33](HANDOVER_v1.0.33.md). Frühere Tests bleiben in ihren historischen Handovers eingeordnet.
+Aktueller Prüf- und Release-Stand: [HANDOVER v1.0.42](HANDOVER_v1.0.42.md). Frühere Release-Nachweise bleiben in ihren historischen Handovers eingeordnet.
 Keine zweite veraltete Zeilentabelle hier fortschreiben.
 
 ## Kernabläufe
@@ -80,6 +82,7 @@ Keine zweite veraltete Zeilentabelle hier fortschreiben.
 - `video.twimg.com/tweet_video/<id>.mp4` — **GIFs** (auf X.com MP4-Streams; Poster `pbs.twimg.com/tweet_video_thumb/…` wird umgebaut).
 - `abs.twimg.com` — X.com-Scripts (für Live-Token-Suche, `@connect` nötig).
 - `pscp.tv` und Unterdomains — unterstützte Broadcast-/HLS-Aufzeichnungen, gemäß Metablock freigegeben.
+- `cdn.syndication.twimg.com` — öffentliche Tweet-Metadaten als ansichtsunabhängiger Fallback für die Timeline.
 
 ## Bekannte Fallstricke & Erkenntnisse
 
@@ -106,7 +109,7 @@ Der maßgebliche Changelog steht im Kommentar am Anfang von `xLoader.user.js`.
 Die dreisprachige Übersicht steht in [README.md](../README.md#version-history--versionshistorie--история-версий).
 Historische Zustände bleiben in den versionsbezogenen Handovers und im Journal
 erhalten. v1.0.25 war nur lokal; veröffentlichter Nachfolger von v1.0.24 ist
-v1.0.26; aktueller veröffentlichter Quell- und Arbeitsstand ist v1.0.39. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
+v1.0.26; aktueller freigegebener Arbeitsstand ist v1.0.42. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
 
 ## Build- & Release-Regeln (verbindlich)
 
@@ -150,7 +153,7 @@ dokumentiert; der reguläre Ablauf benötigt keine Skriptinstallation im Browser
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.39; Metablock + Changelog oben |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.42; Metablock + Changelog oben |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | Versionsarchive `xLoader-v1.0.X.user.js`, ältere `.js` (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |
@@ -175,6 +178,6 @@ unverändert; keine neue Dialogzeitmessung. Details: [HANDOVER v1.0.28](HANDOVER
 
 Analyse des v1.0.33-Quellstands und Umsetzung in v1.0.34-dev:
 [Befunde, Korrekturen und Nachweisgrenzen](HARDENING_2026-10-22.md).
-Die Härtung ist lokal durch 75 Tests geprüft. Der Nutzer bestätigte die aktuelle
-Gesamtfassung im Windows-/Tampermonkey-Betrieb für Fortschritt und vollständige
-Mehrfachmedien-Downloads; GitHub und Greasy Fork liefern v1.0.39.
+Die aktuelle Gesamtfassung ist lokal durch 83 Tests geprüft. Der Nutzer bestätigte
+die korrigierte Hauptansicht und Fortschrittsanzeige im Windows-/Tampermonkey-Betrieb
+und gab v1.0.42 zur Veröffentlichung frei.

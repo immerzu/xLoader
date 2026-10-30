@@ -11,6 +11,7 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [Browser-Neustartfehler und verbindliche Lösung](BROWSER_STARTUP_2026-10-21.md) – **Pflichtlektüre vor Browserarbeiten**: persistentes Profil, dauerhafte Tampermonkey-Installation, Herkunftssperre 12, gültige Startpfade und Neustart-Abnahme. Ersetzt ältere Empfehlungen, Tampermonkey per `--load-extension` zu starten.
 - [HANDOVER v1.0.33](HANDOVER_v1.0.33.md) – aktueller Quell-/Release-Stand: Agent-A-Freigabe, HLS und Abbruch, Integritätsnachweise.
 - [HANDOVER v1.0.39](HANDOVER_v1.0.39.md) – aktueller Release-Stand: Härtung, Mehrfachmedien, Fortschrittsbindung und Veröffentlichungsnachweise.
+- [HANDOVER v1.0.42](HANDOVER_v1.0.42.md) – aktueller Release-Stand: ansichtsunabhängige Timeline-Auflösung, frische Videoquellen und Prozentfortschritt.
 - [HANDOVER v1.0.38-dev](HANDOVER_v1.0.38-dev.md) – historischer lokaler Badge-Fix; durch v1.0.39 gehärtet.
 - [HANDOVER v1.0.37-dev](HANDOVER_v1.0.37-dev.md) – historischer lokaler Fix für vollständigen Buttonersatz; durch v1.0.38-dev erweitert.
 - [HANDOVER v1.0.36-dev](HANDOVER_v1.0.36-dev.md) – historischer lokaler Fortschrittsfix ohne verwertbares GM_download-total; durch v1.0.37-dev fortgeführt.
@@ -25,7 +26,7 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – historischer Snapshot nach dem Projektumzug.
 - [Bestandsaufnahme und offene Bereinigungskandidaten](CLEANUP_2026-10-21.md) – lokale Profile, Archive und Werkzeugdaten; keine Löschfreigabe.
 
-Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.39. Ältere Release-Nachweise bleiben im Handover v1.0.33. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
+Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.42. Ältere Release-Nachweise bleiben in den historischen Handovers. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
 
 ## Pflege-Regeln
 
