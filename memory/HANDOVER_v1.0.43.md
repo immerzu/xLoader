@@ -52,4 +52,15 @@ Video und zitiertem Post) sowie beim zitierten Status `…110095`: Es entstand e
 
 ## Veröffentlichung
 
-Wird nach der Kontrolle von GitHub und Greasy Fork ergänzt.
+Am 2026-11-09 veröffentlicht und gegen beide Dienste geprüft:
+
+- Commit `4ffe39d` (lokal = `origin/main`), Tag `v1.0.43` (annotiert).
+- GitHub-Release <https://github.com/immerzu/xLoader/releases/tag/v1.0.43> mit Asset
+  `xLoader-v1.0.43.user.js`, 178.364 Bytes, SHA-256
+  `FEFDD396DC93C4243818DFF68CC217C15285C90B986EDC317FA6A95C7871D26F`
+  (erneut heruntergeladen und gegen die Quelle verglichen), identisch mit
+  `Ausgabe/xLoader-v1.0.43.user.js`.
+- Greasy Fork 589456 liefert 1.0.43: Rohdatei 178.340 Bytes, nach Entfernung der
+  GF-eigenen `@updateURL`/`@downloadURL`-Zeilen inhaltlich identisch.
+- Kein Browserlauf für diese Fassung; das Browserprofil wurde nicht verändert.
+
