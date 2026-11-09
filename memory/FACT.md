@@ -1,4 +1,4 @@
-# xLoader — FACT SHEET (Stand: v1.0.42 veröffentlicht, 2026-10-30)
+# xLoader — FACT SHEET (Stand: v1.0.42 veröffentlicht; Arbeitsstand 2026-10-30, Übergabe 2026-11-01)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
