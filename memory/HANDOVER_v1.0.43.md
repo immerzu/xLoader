@@ -49,6 +49,10 @@ Video und zitiertem Post) sowie beim zitierten Status `…110095`: Es entstand e
 - Kein Browserlauf in dieser Fassung; der gemeldete Fall wurde vor dem Fix im
   echten Profil (Chrome for Testing, Tampermonkey 5.5.1, xLoader 1.0.42)
   nachgestellt und die Fehlermeldung des Nutzers im Code belegt.
+- **Nutzerbestätigung 2026-11-09:** Der gemeldete Post lädt nach der
+  Veröffentlichung von v1.0.43 korrekt („Alles korrekt."). Damit ist der
+  Ursachenbefund am realen Fall bestätigt; der Nachweis ist eine
+  Nutzeraussage, kein automatisierter Browserlauf.
 
 ## Veröffentlichung
 
