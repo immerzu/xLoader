@@ -1,13 +1,13 @@
-# xLoader — FACT SHEET (Stand: v1.0.42 veröffentlicht; Arbeitsstand 2026-10-30, Übergabe 2026-11-01)
+# xLoader — FACT SHEET (Stand: v1.0.43, 2026-11-09)
 
 Dauerhaftes Projektwissen zum xLoader-Userscript. Bei Änderungen immer die
 Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
-`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.42 dokumentiert).
+`xLoader.user.js` (dort ist die Historie v1.0.4–v1.0.43 dokumentiert).
 
 ## Kerndaten
 
 - **Projekt-Root:** `F:\001_Coding_Projekte\xLoader\`
-- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.42`). Enthält Härtung, Quoted-Video-Fix, gehärteten Videofortschritt nach Timeline-DOM-Recycling sowie den Syndication-Fallback für die Medienauflösung.
+- **Arbeitsdatei:** `xLoader.user.js` (Projektstamm, `@version 1.0.43`). Enthält Härtung, Quoted-Video-Fix, gehärteten Videofortschritt nach Timeline-DOM-Recycling, den Syndication-Fallback für die Medienauflösung und die Zuordnung von Video-Playern zum richtigen Tweet.
 - **Versionsarchive:** seit v1.0.24 `Ausgabe/xLoader-v1.0.X.user.js`, ältere Archive `xLoader-v1.0.X.js`. `Ausgabe/` bleibt gitignored und wird nie committet.
 - **Git-Repo:** `immerzu/xLoader` (Branch `main`) — Git-Autor **immerzu** (repo-local `user.name`/`user.email` setzen, NICHT global ändern).
 - **Greasy Fork:** Skript **589456** (`https://greasyfork.org/de/scripts/589456-xloader`), Account `immerzu`.
@@ -15,9 +15,11 @@ Stand-Zeile oben aktualisieren. Vollständiger Changelog: Kommentar oben in
 - **Auto-Update im Skript:** `@updateURL`/`@downloadURL` = raw GitHub `main`.
 - **Install-Link:** `https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js` (Tampermonkey bietet Installation an).
 - **Zweck:** Ein Downloadbutton pro Tweet mit Medien. Unterstützte Browser wählen das erste Ziel vor dem Streaming-Transfer; fehlende Benutzeraktivierung/API nutzt GM_download. Prefetch reduziert die Metadatensuche.
-- **Aktueller freigegebener Arbeitsstand:** v1.0.42, veröffentlicht und inhaltlich geprüft (GitHub-Release mit Asset, Greasy-Fork-Auslieferung 1.0.42, Abweichung nur die GF-eigenen URL-Zeilen). Aktueller Einstieg: `HANDOVER_v1.0.42.md`.
+- **Aktueller Arbeitsstand:** v1.0.43 (2026-11-09), veröffentlicht; Details und Nachweise in `HANDOVER_v1.0.43.md`.
 
-## Aktueller Arbeits- und Release-Stand (v1.0.42)
+## Aktueller Arbeits- und Release-Stand (v1.0.43)
+
+- **v1.0.43, 2026-11-09:** Ein Video-Player im zitierten Tweet wurde dem äußeren Post zugeordnet (X rendert Quotes im selben `article`). Dadurch öffnete xLoader eine frühe `.mp4`-Dateiauswahl, obwohl der Post nur Bilder hat; nach der Auflösung brach der Lauf mit `Videokarte ohne Videodatei` ab und hinterließ eine 0-Byte-Datei. Neu: `playerBelongsToTweet` prüft den Status-Link des Players; unpassende frühe Auswahlen werden verworfen und `GM_download` übernimmt mit korrekter Endung. 128 lokale Subtests erfolgreich. Details: `HANDOVER_v1.0.43.md`.
 
 - **v1.0.42, 2026-10-30:** Öffentliche Tweet-Medien über einen ansichtsunabhängigen Syndication-Fallback auflösen; veraltete Timeline-Videoquellen nach der frühen Dateiauswahl erneuern; laufende Player/Performance-Quellen erhalten und fehlende direkte Gesamtgrößen für Prozentfortschritt per HEAD ergänzen. Nutzer bestätigte die Korrektur unter Windows/Tampermonkey und gab die Veröffentlichung frei. Veröffentlicht: Commit `b6ba6b4`, Tag `v1.0.42`, GitHub-Release mit Asset 176.465 Bytes / SHA-256 `FDA18B75…5E17`; Greasy Fork liefert 1.0.42 (176.441 Bytes) und ist nach Entfernung der GF-eigenen `@updateURL`/`@downloadURL`-Zeilen inhaltlich identisch. Details: `HANDOVER_v1.0.42.md`.
 
@@ -109,7 +111,7 @@ Der maßgebliche Changelog steht im Kommentar am Anfang von `xLoader.user.js`.
 Die dreisprachige Übersicht steht in [README.md](../README.md#version-history--versionshistorie--история-версий).
 Historische Zustände bleiben in den versionsbezogenen Handovers und im Journal
 erhalten. v1.0.25 war nur lokal; veröffentlichter Nachfolger von v1.0.24 ist
-v1.0.26; aktueller freigegebener Arbeitsstand ist v1.0.42. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
+v1.0.26; aktueller Arbeitsstand ist v1.0.43. Lokale Tags lassen sich mit `git tag --list` kontrollieren.
 
 ## Build- & Release-Regeln (verbindlich)
 
@@ -153,7 +155,7 @@ dokumentiert; der reguläre Ablauf benötigt keine Skriptinstallation im Browser
 
 | Pfad | Zweck |
 |------|-------|
-| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.42; Metablock + Changelog oben |
+| `F:\001_Coding_Projekte\xLoader\xLoader.user.js` | **Arbeitsdatei** v1.0.43; Metablock + Changelog oben |
 | `F:\001_Coding_Projekte\xLoader\Ausgabe\` | aktuelle Archive `xLoader-v1.0.X.user.js`; `!old/` mit älteren `.js`-Archiven und Sicherungen (gitignored) |
 | `F:\001_Coding_Projekte\xLoader\README.md` | Projekt-README (dreisprachig, Versionshistorie, Development) |
 | `F:\001_Coding_Projekte\xLoader\description.md` | Greasy-Fork „Zusätzliche Informationen“ (DE → RU → EN) |
@@ -178,8 +180,8 @@ unverändert; keine neue Dialogzeitmessung. Details: [HANDOVER v1.0.28](HANDOVER
 
 Analyse des v1.0.33-Quellstands und Umsetzung in v1.0.34-dev:
 [Befunde, Korrekturen und Nachweisgrenzen](HARDENING_2026-10-22.md).
-Die aktuelle Gesamtfassung ist lokal geprüft: sechs Testdateien, 126 bestandene
-Subtests, 0 Fehler (Nachzählung 2026-10-30 mit Node.js 22.23.4; Aufschlüsselung
+Die aktuelle Gesamtfassung ist lokal geprüft: sechs Testdateien, 128 bestandene
+Subtests, 0 Fehler (Nachzählung 2026-11-09 mit Node.js 22.23.4; Aufschlüsselung
 siehe [README](../README.md#development--entwicklung--разработка)). Ältere
 Handovers nennen für ihren jeweiligen Stand andere Summen (75 bzw. 83) ohne
 Aufschlüsselung. Der Nutzer bestätigte

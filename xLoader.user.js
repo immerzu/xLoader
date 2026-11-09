@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         xLoader
 // @namespace    https://github.com/immerzu/xLoader
-// @version      1.0.42
+// @version      1.0.43
 // @description  Lädt Bilder, Videos, GIFs und unterstützte HLS-Aufzeichnungen von X.com/Twitter herunter. Schnelle Dateiauswahl vor dem Streaming, zuverlässige Medienauflösung in Timeline und Einzelansicht, Fortschritt, Abbruchbestätigung, GM_download-Fallback und Dateinamenoptionen.
 // @description:en Downloads images, videos, GIFs and supported HLS recordings from X.com/Twitter. Fast file selection before streaming, reliable media resolution in timelines and individual posts, progress, cancel confirmation, GM_download fallback and filename options.
 // @description:ru Загружает изображения, видео, GIF и поддерживаемые записи HLS с X.com/Twitter. Быстрый выбор файла до потоковой передачи, надёжное определение медиа в ленте и отдельном посте, прогресс, подтверждение отмены, резервный GM_download и настройка имён файлов.
@@ -29,6 +29,14 @@
 // ==/UserScript==
 
 /*
+ * xLoader v1.0.43 (Dateiauswahl und zitierte Videos)
+ *  - Ein Video-Player im selben article wird nur noch dem Tweet zugeordnet,
+ *    wenn sein Status-Link auf dessen eigene ID zeigt. Ein Video aus einem
+ *    zitierten Tweet löst damit keinen falschen .mp4-Dialog mehr aus.
+ *  - Passt eine frueh gewaehlte .mp4-Datei nicht zum ersten Medium, bricht der
+ *    Lauf nicht mehr ab: Die leere Zieldatei wird verworfen und GM_download
+ *    uebernimmt mit korrigierter Endung. Keine 0-Byte-Datei mehr.
+ * ---------------------------------------------------------------------------
  * xLoader v1.0.42 (ansichtsunabhängiger Timeline-Metadatenfallback)
  *  - Wenn Timeline-React-Daten und Conversation-API kein Video liefern,
  *    werden öffentliche X-Syndication-Metadaten anhand der Status-ID geladen.
@@ -1248,6 +1256,20 @@
      */
     function hasMediaIndicator(tweet) {
         return !!findMediaElement(tweet);
+    }
+
+    /**
+     * Ein Video-Player im selben <article> kann zum zitierten Tweet gehören,
+     * weil X Quotes inline ohne eigenes article rendert. Maßgeblich ist der
+     * Status-Link des Players: fehlt er oder zeigt er auf eine andere ID,
+     * gehört der Player nicht zu diesem Tweet. Ohne diese Prüfung würde für
+     * einen Tweet mit Bildern ein .mp4-Dialog geöffnet und die Auswahl später
+     * verworfen (0-Byte-Datei).
+     */
+    function playerBelongsToTweet(player, tweetId) {
+        var link = player && player.closest ? player.closest('a[href*="/status/"]') : null;
+        var match = link ? (link.getAttribute('href') || '').match(/\/status\/(\d+)/) : null;
+        return !!match && match[1] === String(tweetId);
     }
 
     // ============================ X-API (Video-/GIF-URLs) =================
@@ -2982,6 +3004,7 @@
         var selectedFilename = null;
         var retryItems = null;
         var usedFastItems = false;
+        var pickerRejected = false;
 
         try {
             ensureNotCancelled(task.signal);
@@ -2996,6 +3019,7 @@
                 var ownPlayers = tweet.querySelectorAll('video, [data-testid="videoPlayer"], [data-testid="videoComponent"]');
                 for (var pv = 0; pv < ownPlayers.length; pv++) {
                     if (ownPlayers[pv].closest(CONFIG.tweetSelector) !== tweet) continue;
+                    if (!playerBelongsToTweet(ownPlayers[pv], tweetId)) continue;
                     selectedFilename = sanitizeFilenamePart(formatFilename(getFilenameTemplate(), {
                         handle: handle, id: tweetId, index: 1, ext: 'mp4'
                     }));
@@ -3055,8 +3079,14 @@
             items = await mergeDomItems(tweet, items, task.signal);
             ensureNotCancelled(task.signal);
             if (selectedFile && items.length && items[0].ext !== 'mp4' && selectedFilename && /\.mp4$/i.test(selectedFilename)) {
-                // No incorrect extension: the picker chose an MP4 but API found an image.
-                throw new Error('Videokarte ohne Videodatei: Dateiauswahl nicht übernommen');
+                // Die früh gewählte .mp4-Datei passt nicht zum ersten Medium
+                // (z. B. Poster eines zitierten Tweets). Die leere Zieldatei
+                // nicht weiterverwenden und den Lauf nicht abbrechen: ohne
+                // Dateiauswahl übernimmt GM_download den korrekten Namen.
+                log.warn('Dateiauswahl (.mp4) passt nicht zum Medium (' + items[0].ext + '); verwende GM_download.');
+                selectedFile = null;
+                selectedFilename = null;
+                pickerRejected = true;
             }
 
             ensureNotCancelled(task.signal);
@@ -3122,9 +3152,10 @@
                         };
                         if (i === 0) {
                             // Reiner DOM-Fallback: jetzt erst steht die Endung
-                            // fest. Falls die Aktivierung abgelaufen ist, wird
+                            // fest. Falls die Aktivierung abgelaufen ist oder
+                            // die frühe .mp4-Auswahl verworfen wurde, wird
                             // unverändert GM_download verwendet.
-                            if (!selectedFile && !selectedFilename) selectedFile = await selectDownloadFile(filename);
+                            if (!selectedFile && !selectedFilename && !pickerRejected) selectedFile = await selectDownloadFile(filename);
                         }
                         if (items[i].broadcastId) {
                             var broadcastUrl = await broadcastPlaybackUrl(items[i].broadcastId, task.signal);
@@ -3432,7 +3463,7 @@
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
-        log.info('xLoader v1.0.42 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
+        log.info('xLoader v1.0.43 aktiv — überwache ' + CONFIG.tweetSelector + ' …');
     }
 
     if (document.readyState === 'loading') {

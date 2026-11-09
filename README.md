@@ -31,11 +31,11 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 2. Установите скрипт: откройте [xLoader.user.js](https://raw.githubusercontent.com/immerzu/xLoader/main/xLoader.user.js) — Tampermonkey предложит установку. (Альтернатива: склонируйте репозиторий и импортируйте файл через панель Tampermonkey.)
 3. Откройте [x.com](https://x.com) — под каждым твитом с медиа появится кнопка загрузки в панели действий.
 
-## What's new in v1.0.42 / Neu in v1.0.42 / Новое в v1.0.42
+## What's new in v1.0.43 / Neu in v1.0.43 / Новое в v1.0.43
 
-- **EN:** Resolves public tweet media independently of the current X view, refreshes stale timeline video URLs after file selection and restores percentage progress for large progressive videos while retaining the v1.0.39 hardening and multi-media support.
-- **DE:** Löst öffentliche Tweet-Medien unabhängig von der aktuellen X-Ansicht auf, erneuert veraltete Timeline-Video-URLs nach der Dateiauswahl und stellt den Prozentfortschritt großer progressiver Videos wieder her; Härtung und Mehrfachmedien aus v1.0.39 bleiben erhalten.
-- **RU:** Медиа публичных постов теперь определяются независимо от текущего вида X, устаревшие URL видео в ленте обновляются после выбора файла, а для больших progressive-видео снова показывается процентный прогресс; усиленная защита и загрузка нескольких файлов из v1.0.39 сохранены.
+- **EN:** A video player inside a quoted tweet no longer triggers an early `.mp4` picker for the outer post; a mismatched early file choice is discarded instead of aborting with an empty file, and `GM_download` takes over with the corrected extension.
+- **DE:** Ein Video-Player im zitierten Tweet löst beim äußeren Post keinen frühen `.mp4`-Dialog mehr aus; eine unpassende frühe Dateiauswahl wird verworfen, statt mit einer leeren Datei abzubrechen, und `GM_download` übernimmt mit korrigierter Endung.
+- **RU:** Видеоплеер внутри цитируемого поста больше не вызывает ранний `.mp4`-диалог для внешнего поста; неподходящий ранний выбор файла отбрасывается вместо прерывания с пустым файлом, а `GM_download` использует исправленное расширение.
 
 ## Features / Funktionen / Возможности
 
@@ -78,6 +78,8 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 **English 🇬🇧:** Latest version: **v1.0.42** — the full changelog lives in the comment at the top of `xLoader.user.js`.
 
+- **v1.0.43** — a quoted tweet's video player no longer triggers an early `.mp4` picker for the outer post; a mismatched early file choice is discarded and `GM_download` uses the corrected extension, so no empty file is left behind.
+
 - **v1.0.42** — view-independent public tweet metadata fallback, refreshed timeline video URLs after file selection and restored percentage progress for large progressive videos.
 
 - **v1.0.39** — hardened media/HLS integrity and cancellation, fixed nested/quoted media, complete multi-media downloads, and persistent progress across timeline DOM recycling.
@@ -108,6 +110,8 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.6** — renamed to "xLoader" (previously "Downloadhilfe").
 
 **Deutsch 🇩🇪:** Neueste veröffentlichte Version: **v1.0.42** — der vollständige Changelog steht im Kommentar oben in `xLoader.user.js`.
+
+- **v1.0.43** — der Video-Player eines zitierten Tweets löst beim äußeren Post keinen frühen `.mp4`-Dialog mehr aus; eine unpassende frühe Dateiauswahl wird verworfen und `GM_download` nutzt die korrigierte Endung, sodass keine leere Datei zurückbleibt.
 
 - **v1.0.42** — ansichtsunabhängiger Metadatenfallback für öffentliche Tweets, erneuerte Timeline-Video-URLs nach der Dateiauswahl und wiederhergestellter Prozentfortschritt für große progressive Videos.
 
@@ -140,6 +144,8 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 
 **Русский 🇷🇺:** Последняя версия: **v1.0.42** — полный журнал изменений находится в комментарии в начале `xLoader.user.js`.
 
+- **v1.0.43** — видеоплеер цитируемого поста больше не вызывает ранний `.mp4`-диалог для внешнего поста; неподходящий ранний выбор файла отбрасывается, а `GM_download` использует исправленное расширение, поэтому пустой файл не остаётся.
+
 - **v1.0.42** — независимое от вида определение медиа публичных постов, обновление URL видео из ленты после выбора файла и восстановленный процентный прогресс для больших progressive-видео.
 
 - **v1.0.39** — усилена целостность медиа/HLS и отмена, исправлены вложенные/цитируемые медиа, полная загрузка нескольких файлов и сохранение прогресса при переработке DOM.
@@ -169,17 +175,17 @@ Medien-Downloader-Userscript für X.com/Twitter. Bei erkannten Medien erscheint 
 - **v1.0.7** — меню Tampermonkey (режим сохранения, очистка кэша), надёжное извлечение ID твита.
 - **v1.0.6** — переименование в «xLoader» (ранее «Downloadhilfe»).
 
-Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33, v1.0.39, v1.0.42 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
+Git tags / Git-Tags / теги: v1.0.6 – v1.0.12, v1.0.15, v1.0.16, v1.0.21, v1.0.22, v1.0.23, v1.0.24, v1.0.26, v1.0.33, v1.0.39, v1.0.42, v1.0.43 (v1.0.25 was local only / war nur lokal / была только локальной; v1.0.13/v1.0.14 never published / wurden nie veröffentlicht / никогда не публиковались; v1.0.17–v1.0.20 were documentation-only updates without a tag / waren reine Beschreibungs-Updates ohne Tag / были только обновлениями описания без тега). Latest release on [GitHub](https://github.com/immerzu/xLoader/releases) and [Greasy Fork](https://greasyfork.org/de/scripts/589456-xloader).
 
 ## Development / Entwicklung / Разработка
 
-Published source / veröffentlichte Quelle: **v1.0.42**. It retains the v1.0.39 hardening and media support, refreshes stale timeline sources, resolves public tweet media independently of the current X view and restores percentage progress for large progressive videos; see [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md). Earlier test builds remain historical local archives.
+Published source / veröffentlichte Quelle: **v1.0.43**. It retains the v1.0.42 timeline fallback and progress work and fixes the file selection for quoted videos; see [HANDOVER v1.0.43](memory/HANDOVER_v1.0.43.md). Earlier test builds remain historical local archives.
 
-**English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins and run per file from the project root — `node --test tests/` does not drive these harnesses. Last full run 2026-10-30 (Node.js 22.23.4): 126 passing subtests in six files, 0 failures. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
+**English 🇬🇧:** Edit [xLoader.user.js](xLoader.user.js); its opening comment is the authoritative changelog. There is no compilation step or npm dependency installation. Tests use Node.js built-ins and run per file from the project root — `node --test tests/` does not drive these harnesses. Last full run 2026-11-09 (Node.js 22.23.4): 128 passing subtests in six files, 0 failures. Archives and evidence belong in ignored `Ausgabe/`. Release steps require explicit permission; see [FACT.md](memory/FACT.md).
 
-**Deutsch 🇩🇪:** Arbeitsdatei ist [xLoader.user.js](xLoader.user.js); der Kommentar am Anfang enthält den maßgeblichen Changelog. Kein Kompilieren oder Installieren von npm-Abhängigkeiten nötig. Tests verwenden Node.js-Bordmittel und werden im Projektstamm einzeln ausgeführt — `node --test tests/` startet diese Harnesses nicht. Letzter vollständiger Lauf 2026-10-30 (Node.js 22.23.4): 126 bestandene Subtests in sechs Dateien, 0 Fehler. Versionsarchive und Prüfnachweise gehören nach `Ausgabe/` (ignoriert). Release-Schritte benötigen ausdrückliche Freigabe; Ablauf in [FACT.md](memory/FACT.md).
+**Deutsch 🇩🇪:** Arbeitsdatei ist [xLoader.user.js](xLoader.user.js); der Kommentar am Anfang enthält den maßgeblichen Changelog. Kein Kompilieren oder Installieren von npm-Abhängigkeiten nötig. Tests verwenden Node.js-Bordmittel und werden im Projektstamm einzeln ausgeführt — `node --test tests/` startet diese Harnesses nicht. Letzter vollständiger Lauf 2026-11-09 (Node.js 22.23.4): 128 bestandene Subtests in sechs Dateien, 0 Fehler. Versionsarchive und Prüfnachweise gehören nach `Ausgabe/` (ignoriert). Release-Schritte benötigen ausdrückliche Freigabe; Ablauf in [FACT.md](memory/FACT.md).
 
-**Русский 🇷🇺:** Исходник — [xLoader.user.js](xLoader.user.js); основной журнал изменений находится в начальном комментарии. Компиляция и установка npm-зависимостей не нужны. Тесты используют встроенные модули Node.js и запускаются пофайлово из корня проекта — `node --test tests/` эти harnesses не запускает. Последний полный прогон 2026-10-30 (Node.js 22.23.4): 126 успешных подтестов в шести файлах, 0 ошибок. Архивы и результаты проверок хранятся в игнорируемом `Ausgabe/`. Публикация требует явного разрешения; порядок — в [FACT.md](memory/FACT.md).
+**Русский 🇷🇺:** Исходник — [xLoader.user.js](xLoader.user.js); основной журнал изменений находится в начальном комментарии. Компиляция и установка npm-зависимостей не нужны. Тесты используют встроенные модули Node.js и запускаются пофайлово из корня проекта — `node --test tests/` эти harnesses не запускает. Последний полный прогон 2026-11-09 (Node.js 22.23.4): 128 успешных подтестов в шести файлах, 0 ошибок. Архивы и результаты проверок хранятся в игнорируемом `Ausgabe/`. Публикация требует явного разрешения; порядок — в [FACT.md](memory/FACT.md).
 
 ```powershell
 node --check xLoader.user.js
@@ -191,9 +197,9 @@ node tests/progressive-media.test.cjs
 node tests/watchdog.test.cjs
 ```
 
-Passing subtests per file (2026-10-30): dom-media 11, fixes 16, download-flow 39, hardening 23, progressive-media 18, watchdog 19.
+Passing subtests per file (2026-11-09): dom-media 11, fixes 16, download-flow 41, hardening 23, progressive-media 18, watchdog 19.
 
-The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.42 passed the full local suite; the user confirmed the corrected main-timeline download behavior and progress in their Windows/Tampermonkey browser. Publication evidence is recorded in [HANDOVER v1.0.42](memory/HANDOVER_v1.0.42.md); earlier evidence remains in the historical handovers.
+The v1.0.34-dev hardening and later fixes remain documented in their handovers. v1.0.43 passed the full local suite; the quoted-video file selection was reported by the user and fixed with regression tests. Publication evidence is recorded in [HANDOVER v1.0.43](memory/HANDOVER_v1.0.43.md); earlier evidence remains in the historical handovers.
 
 | Path / Pfad / Путь | Purpose / Zweck / Назначение |
 |---|---|

@@ -11,7 +11,8 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [Browser-Neustartfehler und verbindliche Lösung](BROWSER_STARTUP_2026-10-21.md) – **Pflichtlektüre vor Browserarbeiten**: persistentes Profil, dauerhafte Tampermonkey-Installation, Herkunftssperre 12, gültige Startpfade und Neustart-Abnahme. Ersetzt ältere Empfehlungen, Tampermonkey per `--load-extension` zu starten.
 - [HANDOVER v1.0.33](HANDOVER_v1.0.33.md) – aktueller Quell-/Release-Stand: Agent-A-Freigabe, HLS und Abbruch, Integritätsnachweise.
 - [HANDOVER v1.0.39](HANDOVER_v1.0.39.md) – aktueller Release-Stand: Härtung, Mehrfachmedien, Fortschrittsbindung und Veröffentlichungsnachweise.
-- [HANDOVER v1.0.42](HANDOVER_v1.0.42.md) – aktueller Release-Stand: ansichtsunabhängige Timeline-Auflösung, frische Videoquellen und Prozentfortschritt.
+- [HANDOVER v1.0.43](HANDOVER_v1.0.43.md) – aktueller Release-Stand: Dateiauswahl bei zitierten Videos, keine 0-Byte-Dateien.
+- [HANDOVER v1.0.42](HANDOVER_v1.0.42.md) – vorheriger Release-Stand: ansichtsunabhängige Timeline-Auflösung, frische Videoquellen und Prozentfortschritt.
 - [Übergabe 2026-11-01](UEBERGABE_2026-11-01.md) – Chatfenster-Übergabe: geprüfter Stand (`91c079c`), offene Kandidaten, nächste Schritte und Prüfbefehle.
 - [HANDOVER v1.0.38-dev](HANDOVER_v1.0.38-dev.md) – historischer lokaler Badge-Fix; durch v1.0.39 gehärtet.
 - [HANDOVER v1.0.37-dev](HANDOVER_v1.0.37-dev.md) – historischer lokaler Fix für vollständigen Buttonersatz; durch v1.0.38-dev erweitert.
@@ -27,7 +28,7 @@ der `memory/`-Ordner, den alle Nachbarprojekte besitzen.
 - [HANDOVER v1.0.22](HANDOVER_v1.0.22.md) – historischer Snapshot nach dem Projektumzug.
 - [Bestandsaufnahme und offene Bereinigungskandidaten](CLEANUP_2026-10-21.md) – lokale Profile, Archive und Werkzeugdaten; zuletzt am 2026-10-30 auf den v1.0.42-Stand fortgeschrieben; keine Löschfreigabe.
 
-Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.42; für den laufenden Stand zuletzt [Übergabe 2026-11-01](UEBERGABE_2026-11-01.md). Ältere Release-Nachweise bleiben in den historischen Handovers. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
+Aktueller Einstieg: `AGENTS.md` → dieses Verzeichnis → `FACT.md` und Handover v1.0.43; für den laufenden Stand zuletzt [Übergabe 2026-11-01](UEBERGABE_2026-11-01.md). Ältere Release-Nachweise bleiben in den historischen Handovers. Ältere Handovers und Journal-Einträge beschreiben historische Zustände und sind keine aktuellen Browser- oder Release-Anweisungen.
 
 ## Pflege-Regeln
 

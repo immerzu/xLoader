@@ -43,6 +43,30 @@ test('missing File System Access API uses legacy fallback',async()=>{const f=fix
 test('expired activation uses legacy fallback',async()=>{const f=fixture();f.context.navigator.userActivation.isActive=false;assert.equal(await f.context.selectDownloadFile('a'),null);assert.equal(f.state.events.length,0)});
 for(const name of ['SecurityError','NotSupportedError','TypeError'])test(name+' uses legacy fallback',async()=>{const f=fixture();f.context.window.showSaveFilePicker=()=>{const e=Error();e.name=name;throw e};assert.equal(await f.context.selectDownloadFile('a'),null)});
 test('picker cancellation is not retried as legacy download',async()=>{const f=clickFixture({cancel:true}),btn={};await f.context.onDownloadClick({},btn);assert.deepEqual(f.state.events,['picker']);assert.equal(btn.disabled,false)});
+test('video player of a quoted tweet does not belong to the outer tweet',()=>{
+ const fn=source.slice(source.indexOf('function playerBelongsToTweet('),source.indexOf('function getCookies('));
+ assert.ok(fn.includes('playerBelongsToTweet'),'playerBelongsToTweet nicht gefunden');
+ const ctx={};vm.createContext(ctx);vm.runInContext(fn,ctx);
+ const link=href=>({closest:()=>href===null?null:{getAttribute:()=>href}});
+ assert.equal(ctx.playerBelongsToTweet(link('/author/status/123/video/1'),'123'),true);
+ assert.equal(ctx.playerBelongsToTweet(link('/other/status/999/video/1'),'123'),false);
+ assert.equal(ctx.playerBelongsToTweet(link(null),'123'),false);
+});
+test('rejected .mp4 picker keeps running with the correct extension',async()=>{
+ const f=clickFixture({cached:true,picker:true});
+ f.context.getCachedItems=()=>[{url:'https://video.twimg.com/amplify_video/1/vid/a.mp4',ext:'mp4'}];
+ f.context.mergeDomItems=async()=>[{url:'https://pbs.twimg.com/media/x.jpg',ext:'jpg'}];
+ let pickers=0;const original=f.context.selectDownloadFile;
+ f.context.selectDownloadFile=async name=>{pickers++;return original(name)};
+ const btn={};
+ await f.context.onDownloadClick({},btn);
+ assert.equal(f.state.error,undefined,'Lauf darf nicht abbrechen');
+ assert.equal(pickers,1,'keine zweite Dateiauswahl');
+ const legacy=f.state.events.filter(e=>e&&e.legacy);
+ assert.equal(legacy.length,1);
+ assert.ok(/\.jpg$/.test(legacy[0].name),'GM_download nutzt die korrigierte Endung');
+ assert.equal(btn.disabled,false);
+});
 test('HEAD size probe supplies a missing stream total without downloading media',async()=>{
  const f=fixture();let options,size=0;
  f.context.GM_xmlhttpRequest=o=>{options=o;queueMicrotask(()=>o.onload({status:200,responseHeaders:'Content-Length: 50000000'}));return{abort(){}}};
